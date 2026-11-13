@@ -558,8 +558,7 @@
             "description": "integer 1..32768; UTF-8 JSON bytes; metadata too small explicitly rejected"
           }
         },
-        "required": [],
-        "additionalProperties": false
+        "required": []
       },
       "output": {
         "type": "object",
@@ -628,8 +627,7 @@
         },
         "required": [
           "objectRef"
-        ],
-        "additionalProperties": false
+        ]
       },
       "output": {
         "type": "object",
@@ -669,8 +667,7 @@
             "description": "integer 1..32768; UTF-8 JSON bytes; metadata too small explicitly rejected"
           }
         },
-        "required": [],
-        "additionalProperties": false
+        "required": []
       },
       "output": {
         "type": "object",
@@ -711,8 +708,7 @@
             "type": "boolean"
           }
         },
-        "required": [],
-        "additionalProperties": false
+        "required": []
       },
       "output": {
         "type": "object",
