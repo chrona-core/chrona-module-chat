@@ -1,12 +1,12 @@
 export type MindUpdate = { id: string; revision: number; status: string; goal: string; waitReason?: string; nextStep?: string; artifactRefs: string[]; updatedAt: string };
 
 /** Optional live projection. It never writes Chat messages, observations or Agent commands. */
-export async function readMindUpdates(call: (target: {moduleId: string; tool: string}, args: Record<string, unknown>) => Promise<unknown>, moduleId: string | undefined, conversationId: string): Promise<MindUpdate[]> {
+export async function readMindUpdates(call: (target: {moduleId: string; tool: string}, args: Record<string, unknown>) => Promise<unknown>, moduleId: string | undefined, conversationId: string, source: {epoch: string; scopeRevision: number}): Promise<MindUpdate[]> {
   if (!moduleId) return [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   let phase = 'call';
   try {
-    const reply = await Promise.race([call({moduleId, tool: 'updates'}, {conversationId}),
+    const reply = await Promise.race([call({moduleId, tool: 'updates'}, {conversationId,...source}),
       new Promise<never>((_, reject) => { timer = setTimeout(() => { phase = 'timeout'; reject(Error('Mind updates timeout')); }, 500); })]);
     phase = 'envelope';
     if (!reply || typeof reply !== 'object' || !('json' in reply) || typeof reply.json !== 'string' || Buffer.byteLength(reply.json) > 32768) throw Error('Invalid Mind updates envelope');

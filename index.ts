@@ -52,8 +52,10 @@ on('tool',async event=>{
    case 'create':{result=store.created(a.requestKey,a.emptyTools===true);if(result)break;const p=await chrona.call('agent.providers',{}) as ProviderList;const available=p.items.filter(p=>p.available&&p.capabilities.conversation);result=store.create(available.length===1?available[0].id:'',a.emptyTools === true ? [] : defaultTools(await discoverTools(chrona.call)),a.requestKey,a.emptyTools===true);break;}
    case 'read':{
     const conversation=await store.reconcile(a.id,a.observe!==true),admission=store.observations.admission(a.id);
-    const updates=admission?await readMindUpdates((target,args)=>chrona.call(target,args),chrona.dependencies.mind,a.id):[];
-    result={...conversation,mindUpdates:admission&&store.observations.admission(a.id)===admission?updates:[]};break;
+    const source=store.observations.scopeTool();
+    const updates=admission?await readMindUpdates((target,args)=>chrona.call(target,args),chrona.dependencies.mind,a.id,{epoch:source.epoch,scopeRevision:source.revision}):[];
+    const current=store.observations.scopeTool();
+    result={...conversation,mindUpdates:admission&&current.epoch===source.epoch&&current.revision===source.revision?updates:[]};break;
    }
    case 'draft':result=store.draft(a.id,JSON.parse(a.patch),a.revision);break;
    case 'edit':result=store.edit(a.id,JSON.parse(a.patch));break;
