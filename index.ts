@@ -87,4 +87,5 @@ const observationTimer=setInterval(()=>{if(observing)return;observing=true;void(
  }catch(error){console.error(JSON.stringify({component:'chat',event:'foreground_observation_failed',error:error instanceof Error?error.message.slice(0,500):'unknown'}));}
  finally{observing=false;}
 })();},10000);
+observationTimer.unref();
 onDisconnect(()=>{clearInterval(observationTimer);});
