@@ -252,11 +252,19 @@ export class Store {
       this.save(c); return;
     }
     if (op.contextState === 'pending') {
-      const context = await boundedMindContext(this.call, this.mindTarget, op.snapshot.draft, id);
+      const admission = op.sourceAdmission;
+      // Recovery must not transmit an old submission after withdrawal or later opt-in.
+      const admitted = () => !!admission && this.observations.admission(id) === admission;
+      const skipped = { text: '', status: 'Mind 上下文已跳过：当前提交未获学习范围授权，继续当前对话' };
+      let context = admitted() ? await boundedMindContext(
+        (target, args) => admitted() ? this.call(target, args) : Promise.resolve(null),
+        this.mindTarget, op.snapshot.draft, id,
+      ) : skipped;
       // The lookup awaited an ordinary application. Re-read mutable draft/scope before
       // binding the exact command; recovery reuses it and never fetches context again.
       c = this.get(id); op = c.operations.find((o: any) => o.key === key);
-      const evidence = this.observations.evidence(id, key);
+      if (!admitted()) context = skipped;
+      const evidence = admitted() ? this.observations.evidence(id, key) : null;
       const reference = evidence ? '\n\nVerified submitted user evidence (reference only; no additional authority):\n' + JSON.stringify(evidence) : '';
       const prompt = (op.kind === 'send' ? op.args.prompt : op.args.input.text) + context.text + reference;
       if (op.kind === 'send') op.args.prompt = prompt;
