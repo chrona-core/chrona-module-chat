@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Store } from './state';
 import { submittedReceipts } from './delivery';
+import { readMindUpdates } from './mind-updates';
 import { discoverTools, defaultTools, TOOL_LIMIT } from './tool-selection';
 // Describe the provider fields consumed by Chat in both source and generated SDK builds.
 type ProviderList = { items: { id: string; name: string; moduleId: string; configuration?: { tool: string }; available: boolean; capabilities: { conversation: boolean } }[] };
@@ -49,7 +50,11 @@ on('tool',async event=>{
    case 'catalog':result=await catalog();break;
    case 'list':result={items:store.list()};break;
    case 'create':{result=store.created(a.requestKey,a.emptyTools===true);if(result)break;const p=await chrona.call('agent.providers',{}) as ProviderList;const available=p.items.filter(p=>p.available&&p.capabilities.conversation);result=store.create(available.length===1?available[0].id:'',a.emptyTools === true ? [] : defaultTools(await discoverTools(chrona.call)),a.requestKey,a.emptyTools===true);break;}
-   case 'read':result=await store.reconcile(a.id);break;
+   case 'read':{
+    const conversation=await store.reconcile(a.id,a.observe!==true),admission=store.observations.admission(a.id);
+    const updates=admission?await readMindUpdates((target,args)=>chrona.call(target,args),chrona.dependencies.mind,a.id):[];
+    result={...conversation,mindUpdates:admission&&store.observations.admission(a.id)===admission?updates:[]};break;
+   }
    case 'draft':result=store.draft(a.id,JSON.parse(a.patch),a.revision);break;
    case 'edit':result=store.edit(a.id,JSON.parse(a.patch));break;
    case 'delete':result=store.delete(a.id,a.confirmed);break;

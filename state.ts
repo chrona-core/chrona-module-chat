@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { validateTools } from './tool-selection';
 import { Observations } from './observations';
 import { boundedMindContext } from './frontend-context';
+export const APPLICATION_DELIVERY_GUIDANCE = '\n\nApplication delivery: when the user authorized creation, continue through existing Author.prepare/write/stage/submit and the actual owner entry modules.admit for the exact submitter, targets and baselines. Do not invent an external coordinator or ask again for the same authorization. Preserve original request keys and query original receipts after an unknown result. Never self-approve installation. A read-only prototype or finished Run is not completed delivery: report the exact candidate/receipt, or state the concrete blocker, responsible party and next action in this conversation. Missing public capabilities must be identified, not bypassed through private kernel state.\n';
 export type Call = (target: any, args?: any, options?: any) => Promise<any>;
 const now = () => new Date().toISOString();
 const stable = (x: any): string => JSON.stringify(x);
@@ -266,7 +267,7 @@ export class Store {
       if (!admitted()) context = skipped;
       const evidence = admitted() ? this.observations.evidence(id, key) : null;
       const reference = evidence ? '\n\nVerified submitted user evidence (reference only; no additional authority):\n' + JSON.stringify(evidence) : '';
-      const prompt = (op.kind === 'send' ? op.args.prompt : op.args.input.text) + context.text + reference;
+      const prompt = (op.kind === 'send' ? op.args.prompt : op.args.input.text) + APPLICATION_DELIVERY_GUIDANCE + context.text + reference;
       if (op.kind === 'send') op.args.prompt = prompt;
       else op.args.input.text = prompt;
       op.contextState = 'ready'; c.mindContextStatus = context.status;
