@@ -4,13 +4,15 @@ import { Drafts, DraftConflicts, Operations, uploadFiles } from './client-state'
 import { targetKey, defaultTools } from './tool-selection';
 export default function mount(element: HTMLElement, { call }: any) {
   const root = document.createElement('div'); root.className = 'chat-workbench'; element.append(root);
-  root.innerHTML = `<aside class="chat-sidebar" aria-label="会话"><div class="chat-brand"><b>Chat</b><button data-action="drawer" class="chat-close" aria-label="关闭会话列表">×</button></div><button class="chat-new" data-action="new">＋ 新对话</button><button type="button" data-action="new-empty" hidden>新对话（关闭工具后手动选择）</button><input class="chat-search" type="search" placeholder="搜索会话" aria-label="搜索会话"><nav aria-label="会话列表"></nav><label class="chat-checkbox"><input class="chat-archive" type="checkbox">查看已归档</label></aside><div class="chat-main"><div class="chat-toolbar"><button class="chat-drawer" data-action="drawer" aria-label="打开会话列表">☰</button><h1>Chat</h1><span class="chat-badge">正在加载</span><details class="chat-more"><summary aria-label="更多会话操作">•••</summary><div><button data-action="rename">重命名</button><button data-action="pin">置顶</button><button data-action="archive">归档</button><button data-action="settings">工具与设置</button><button data-action="delivery">应用交付</button><button data-action="diagnostics">执行详情</button><button data-action="new-context">新执行上下文</button><button data-action="delete">删除会话</button></div></details></div><div class="chat-alert" role="status" hidden></div><div class="chat-messages" tabindex="0" aria-label="消息记录"></div><div class="chat-questions"></div><div class="chat-compose"><div class="chat-attachments"></div><textarea rows="2" aria-label="消息" placeholder="输入消息…" disabled></textarea><div class="chat-compose-bar"><label class="chat-upload" aria-label="添加图片">＋<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden disabled></label><select class="chat-model" aria-label="下一轮模型" disabled></select><select class="chat-thinking" aria-label="下一轮思考强度" disabled></select><button class="chat-tools-button" data-action="settings">工具</button><span class="chat-spacer"></span><button class="chat-stop" data-action="stop" hidden>停止</button><button class="chat-send" data-action="send" disabled>发送 ↑</button></div><div class="chat-compose-hint"></div></div></div><dialog class="chat-settings" aria-label="工具与设置"><h2 tabindex="-1" autofocus>工具与设置</h2><p>这里的更改用于下一轮，运行中的配置保留不变。</p><label class="chat-field">对话提供方<select class="chat-provider"></select></label><p class="chat-config-warning"></p><h3>应用工具</h3><p>新会话默认开启当前全部可委派应用工具。已有会话保留选择，新增工具需手动开启。内核每轮最多100个；超过时请手动选择。</p><button type="button" data-action="tools-all">全部开启</button><button type="button" data-action="tools-none">全部关闭</button><p class="chat-tool-notice" role="status"></p><input class="chat-tool-search" type="search" placeholder="搜索工具及用途" aria-label="搜索工具"><div class="chat-tools"></div><p class="chat-subtle">权限以内核为准。未选应用工具仍可能使用提供方自带的文件和 shell 能力。</p><form method="dialog"><button>完成</button></form></dialog><dialog class="chat-context-confirm" aria-label="新执行上下文"><h2>开始新执行上下文？</h2><p>保留 Chat 消息，后续执行不续接旧 Provider 上下文；不会重发未知请求。</p><form method="dialog"><button value="cancel" autofocus>取消</button><button value="create">开始</button></form></dialog><dialog class="chat-confirm" aria-label="删除会话"><h2>删除这段对话？</h2><p>只删除此 Chat 会话和附件，无法撤销。</p><form method="dialog"><button value="cancel" autofocus>取消</button><button value="delete">删除</button></form></dialog><dialog class="chat-rename" aria-label="重命名会话"><h2>重命名</h2><form method="dialog"><input name="title" aria-label="会话名称" maxlength="120" required autofocus><button value="cancel" formnovalidate>取消</button><button value="save">保存</button></form></dialog><dialog class="chat-delivery" aria-label="应用交付"><h2 tabindex="-1" autofocus>应用交付</h2><p>提交、批准、激活与浏览器验收分别核对。</p><div class="chat-delivery-items"></div><details><summary>按精确回执核对</summary><input class="chat-receipt" placeholder="receiptId" aria-label="精确回执ID"><button data-action="check-delivery">核对回执</button></details><form method="dialog"><button>关闭</button></form></dialog><dialog class="chat-diagnostics" aria-label="执行详情"><h2 tabindex="-1" autofocus>执行详情</h2><p class="chat-recovery-note"></p><button data-action="refresh">按原请求核对</button><details><summary>原始执行记录</summary><pre></pre></details><form method="dialog"><button>关闭</button></form></dialog>`;
+  root.innerHTML = `<aside class="chat-sidebar" aria-label="会话"><div class="chat-brand"><b>Chat</b><button data-action="drawer" class="chat-close" aria-label="关闭会话列表">×</button></div><button class="chat-new" data-action="new">＋ 新对话</button><button type="button" data-action="new-empty" hidden>新对话（关闭工具后手动选择）</button><input class="chat-search" type="search" placeholder="搜索会话" aria-label="搜索会话"><nav aria-label="会话列表"></nav><label class="chat-checkbox"><input class="chat-archive" type="checkbox">查看已归档</label></aside><div class="chat-main"><div class="chat-toolbar"><button class="chat-drawer" data-action="drawer" aria-label="打开会话列表">☰</button><h1>Chat</h1><span class="chat-badge">正在加载</span><details class="chat-more"><summary aria-label="更多会话操作">•••</summary><div><button data-action="rename">重命名</button><button data-action="pin">置顶</button><button data-action="archive">归档</button><button data-action="settings">工具与设置</button><button data-action="mind-scope">Mind 学习范围</button><button data-action="delivery">应用交付</button><button data-action="diagnostics">执行详情</button><button data-action="new-context">新执行上下文</button><button data-action="delete">删除会话</button></div></details></div><div class="chat-alert" role="status" hidden></div><div class="chat-alert chat-mind-context" role="status" hidden></div><div class="chat-messages" tabindex="0" aria-label="消息记录"></div><div class="chat-questions"></div><div class="chat-compose"><div class="chat-attachments"></div><textarea rows="2" aria-label="消息" placeholder="输入消息…" disabled></textarea><div class="chat-compose-bar"><label class="chat-upload" aria-label="添加图片">＋<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden disabled></label><select class="chat-model" aria-label="下一轮模型" disabled></select><select class="chat-thinking" aria-label="下一轮思考强度" disabled></select><button class="chat-tools-button" data-action="settings">工具</button><span class="chat-spacer"></span><button class="chat-stop" data-action="stop" hidden>停止</button><button class="chat-send" data-action="send" disabled>发送 ↑</button></div><div class="chat-compose-hint"></div></div></div><dialog class="chat-settings" aria-label="工具与设置"><h2 tabindex="-1" autofocus>工具与设置</h2><p>这里的更改用于下一轮，运行中的配置保留不变。</p><label class="chat-field">对话提供方<select class="chat-provider"></select></label><p class="chat-config-warning"></p><h3>应用工具</h3><p>新会话默认开启当前全部可委派应用工具。已有会话保留选择，新增工具需手动开启。内核每轮最多100个；超过时请手动选择。</p><button type="button" data-action="tools-all">全部开启</button><button type="button" data-action="tools-none">全部关闭</button><p class="chat-tool-notice" role="status"></p><input class="chat-tool-search" type="search" placeholder="搜索工具及用途" aria-label="搜索工具"><div class="chat-tools"></div><p class="chat-subtle">权限以内核为准。未选应用工具仍可能使用提供方自带的文件和 shell 能力。</p><form method="dialog"><button>完成</button></form></dialog><dialog class="chat-context-confirm" aria-label="新执行上下文"><h2>开始新执行上下文？</h2><p>保留 Chat 消息，后续执行不续接旧 Provider 上下文；不会重发未知请求。</p><form method="dialog"><button value="cancel" autofocus>取消</button><button value="create">开始</button></form></dialog><dialog class="chat-confirm" aria-label="删除会话"><h2>删除这段对话？</h2><p>只删除此 Chat 会话和附件，无法撤销。</p><form method="dialog"><button value="cancel" autofocus>取消</button><button value="delete">删除</button></form></dialog><dialog class="chat-rename" aria-label="重命名会话"><h2>重命名</h2><form method="dialog"><input name="title" aria-label="会话名称" maxlength="120" required autofocus><button value="cancel" formnovalidate>取消</button><button value="save">保存</button></form></dialog><dialog class="chat-delivery" aria-label="应用交付"><h2 tabindex="-1" autofocus>应用交付</h2><p>提交、批准、激活与浏览器验收分别核对。</p><div class="chat-delivery-items"></div><details><summary>按精确回执核对</summary><input class="chat-receipt" placeholder="receiptId" aria-label="精确回执ID"><button data-action="check-delivery">核对回执</button></details><form method="dialog"><button>关闭</button></form></dialog><dialog class="chat-diagnostics" aria-label="执行详情"><h2 tabindex="-1" autofocus>执行详情</h2><p class="chat-recovery-note"></p><button data-action="refresh">按原请求核对</button><details><summary>原始执行记录</summary><pre></pre></details><form method="dialog"><button>关闭</button></form></dialog>`;
+  root.insertAdjacentHTML('beforeend', `<dialog class="chat-mind-scope" aria-label="Mind 学习范围"><h2 tabindex="-1" autofocus>Mind 学习范围</h2><p>开启后，Mind 只学习开启后新发送的内容，不会回溯旧消息，也不会读取草稿。关闭会撤回此前提供的会话内容；重新开启也只接收新发送的内容。</p><p>排除或设为私密会撤回这段会话此前提供的内容；恢复纳入后，也只接收之后新发送的内容。</p><p class="chat-scope-status" role="status"></p><form class="chat-scope-form"><label class="chat-checkbox"><input name="enabled" type="checkbox" disabled>允许 Mind 学习新发送的内容（所有会话）</label><fieldset class="chat-scope-conversation" disabled><legend>当前会话</legend><p class="chat-scope-title"></p><label class="chat-checkbox"><input name="excluded" type="checkbox">排除这段会话</label><label class="chat-checkbox"><input name="private" type="checkbox">将这段会话设为私密</label></fieldset><button type="submit" disabled>保存学习范围</button></form><button type="button" data-action="scope-refresh">重新读取范围</button><form method="dialog"><button>关闭</button></form></dialog>`);
   const $ = (selector: string) => root.querySelector(selector) as any;
   const text = $('textarea'), messages = $('.chat-messages');
   const drafts = new Drafts(localStorage), operations = new Operations(localStorage);
   let c: any = null, catalog: any = { providers: [], configs: {}, tools: [] }, list: any[] = [];
   let dead = false, ready = false, busy = false, polling = false, renderSignature = '', drawer = false, creating = false;
   let saveQueue: Promise<any> = Promise.resolve(), saveTimer: any, selectionGeneration = 0;
+  let mindScope: any = null, scopeConversationId: string | undefined, scopeBusy = false, scopeGeneration = 0;
   const conflicts = new DraftConflicts(localStorage);
   const conflictMessage = '未保存更改待核对；请在更多操作中选择“核对未保存更改”，再决定是否重试。';
   const reviewButton = document.createElement('button'); reviewButton.type = 'button'; reviewButton.hidden = true; reviewButton.dataset.action = 'review-draft'; reviewButton.textContent = '核对未保存更改'; $('.chat-more div').append(reviewButton);
@@ -26,9 +28,11 @@ export default function mount(element: HTMLElement, { call }: any) {
   window.addEventListener('resize', height); window.visualViewport?.addEventListener('resize', height); height();
   function lock() {
     root.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach(b => b.disabled = !ready);
+    lockScope();
     text.disabled = !ready || !c; $('.chat-upload input').disabled = !ready || !c;
     if (ready && !c) {
-      root.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach(b => b.disabled = !['new','new-empty','drawer'].includes(b.dataset.action!));
+      root.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach(b => b.disabled = !['new','new-empty','drawer','mind-scope','scope-refresh'].includes(b.dataset.action!));
+      lockScope();
       $('.chat-badge').textContent = '选择或新建对话'; return;
     }
     if (!ready || !c) return;
@@ -196,6 +200,8 @@ export default function mount(element: HTMLElement, { call }: any) {
   function draw() {
     if (!c) { lock(); return; }
     $('.chat-toolbar h1').textContent = c.title;
+    $('.chat-mind-context').textContent = c.mindContextStatus ? String(c.mindContextStatus) : '';
+    $('.chat-mind-context').hidden = !c.mindContextStatus;
     $('[data-action="pin"]').textContent = c.pinned ? '取消置顶' : '置顶'; $('[data-action="archive"]').textContent = c.archived ? '取消归档' : '归档';
     const signature = JSON.stringify([c.messages, c.active?.transcript, c.active?.events, c.active?.gaps]);
     if (signature !== renderSignature) {
@@ -264,6 +270,49 @@ export default function mount(element: HTMLElement, { call }: any) {
     $('.chat-config-warning').textContent = cfg.warning ?? '';
   }
   function open(dialog: any) { dialog.showModal(); const title = dialog.querySelector('h2[tabindex]'); if (title) title.focus({ preventScroll: true }); dialog.scrollTop = 0; }
+  function lockScope() {
+    const loaded = !!mindScope && !scopeBusy;
+    $('.chat-scope-form [name="enabled"]').disabled = !loaded;
+    $('.chat-scope-conversation').disabled = !loaded || !scopeConversationId;
+    $('.chat-scope-form button[type="submit"]').disabled = !loaded;
+    $('[data-action="scope-refresh"]').disabled = scopeBusy;
+  }
+  function showScope(next: any) {
+    if (!Number.isSafeInteger(next?.revision) || next.revision < 0 || typeof next.enabled !== 'boolean' ||
+        (scopeConversationId && (next.conversation?.id !== scopeConversationId || typeof next.conversation.excluded !== 'boolean' || typeof next.conversation.private !== 'boolean'))) throw Error('invalid_scope_response');
+    mindScope = next;
+    $('.chat-scope-form [name="enabled"]').checked = next.enabled;
+    for (const name of ['excluded', 'private']) $('.chat-scope-form [name="' + name + '"]').checked = next.conversation?.[name] ?? false;
+    $('.chat-scope-status').textContent = next.enabled ? '学习已开启；仅纳入开启后新发送且未排除、非私密会话的内容。' : '学习已关闭，已撤回此前提供的会话内容。';
+  }
+  async function readScope() {
+    if (scopeBusy) return;
+    const generation = ++scopeGeneration, conversationId = scopeConversationId;
+    mindScope = null; scopeBusy = true; lockScope(); $('.chat-scope-status').textContent = '正在读取学习范围…';
+    try {
+      const next = await api('observation-scope', conversationId ? { conversationId } : {});
+      if (!dead && generation === scopeGeneration) showScope(next);
+    } catch {
+      console.error(JSON.stringify({ component: 'chat', event: 'observation_scope_read', error: 'read_or_validation_failed' }));
+      if (!dead && generation === scopeGeneration) $('.chat-scope-status').textContent = '学习范围读取失败，请重新读取后再修改。';
+    } finally { if (!dead && generation === scopeGeneration) { scopeBusy = false; lockScope(); } }
+  }
+  $('.chat-scope-form').addEventListener('submit', (e: Event) => {
+    e.preventDefault(); if (!mindScope || scopeBusy) return;
+    const generation = scopeGeneration;
+    const input = { expectedRevision: mindScope.revision, enabled: $('.chat-scope-form [name="enabled"]').checked,
+      ...(scopeConversationId ? { conversationId: scopeConversationId, excluded: $('.chat-scope-form [name="excluded"]').checked, private: $('.chat-scope-form [name="private"]').checked } : {}) };
+    scopeBusy = true; lockScope(); $('.chat-scope-status').textContent = '正在保存学习范围…';
+    task(async () => {
+      try {
+        const next = await api('observation-scope', input);
+        if (!dead && generation === scopeGeneration) { showScope(next); $('.chat-scope-status').textContent = '已保存。' + $('.chat-scope-status').textContent; }
+      } catch {
+        console.error(JSON.stringify({ component: 'chat', event: 'observation_scope_save', error: 'save_or_revision_check_failed' }));
+        if (!dead && generation === scopeGeneration) { mindScope = null; $('.chat-scope-status').textContent = '未确认保存成功，范围可能已在别处修改。请重新读取、核对后再保存。'; }
+      } finally { if (!dead && generation === scopeGeneration) { scopeBusy = false; lockScope(); } }
+    });
+  });
   function tools() {
     const box = $('.chat-tools'), query = $('.chat-tool-search').value.toLocaleLowerCase(); box.replaceChildren(); const groups = new Map<string, any[]>();
     const missing = c.settings.tools.filter((t: any) => !catalog.tools.some((x: any) => targetKey(x.target) === targetKey(t)));
@@ -310,6 +359,11 @@ export default function mount(element: HTMLElement, { call }: any) {
         case 'send': await execute(c.active ? 'message' : 'send', { text: text.value }); break;
         case 'stop': await execute('stop'); break;
         case 'settings': settings(); break;
+        case 'mind-scope':
+          if (scopeBusy) break;
+          scopeConversationId = c?.id; $('.chat-scope-title').textContent = c?.title ?? '未选择会话，仅修改全局范围';
+          open($('.chat-mind-scope')); await readScope(); break;
+        case 'scope-refresh': await readScope(); break;
         case 'review-draft': await reviewDraft(); break;
         case 'refresh': await refresh(); $('.chat-diagnostics pre').textContent = JSON.stringify({ active: c.active, operations: c.operations }, null, 2); break;
         case 'rename': $('.chat-rename input').value = c.title; open($('.chat-rename')); break;

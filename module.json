@@ -25,7 +25,8 @@
     "web.page-set",
     "web.pages",
     "pi.configure",
-    "pi.models"
+    "pi.models",
+    "mind.context"
   ],
   "tests": [
     "test.ts"
@@ -90,8 +91,18 @@
       "idempotent": true,
       "parameters": {
         "type": "object",
-        "properties": {"requestKey":{"type":"string","description":"稳定的新建请求key，1至128字符；未知结果重试必须复用"},"emptyTools":{"type":"boolean"}},
-        "required": ["requestKey"]
+        "properties": {
+          "requestKey": {
+            "type": "string",
+            "description": "稳定的新建请求key，1至128字符；未知结果重试必须复用"
+          },
+          "emptyTools": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requestKey"
+        ]
       },
       "output": {
         "type": "object",
@@ -508,6 +519,200 @@
           "id",
           "confirmed"
         ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "observations",
+      "description": "纯读取已公开的持久来源事件；不核对或启动 Agent；epoch+cursor恢复，撤回不泄漏旧片段",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sourceEpoch": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number",
+            "description": "integer 1..50; default 50"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "integer 1..32768; UTF-8 JSON bytes; metadata too small explicitly rejected"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "snapshot",
+      "description": "纯读取已发送对象；可按 inventory token固定水位；范围缩小立即拒绝旧token",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "objectRef": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "message",
+                  "operation",
+                  "conversation"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "expectedRevision": {
+            "type": "number"
+          },
+          "snapshotToken": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number",
+            "description": "integer 1..50; default 50"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "integer 1..32768; UTF-8 JSON bytes; metadata too small explicitly rejected"
+          }
+        },
+        "required": [
+          "objectRef"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "observation-inventory",
+      "description": "固定来源epoch、范围版本和高水位的有界重建清单；token五分钟/进程重启失效",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "snapshotToken": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number",
+            "description": "integer 1..50; default 50"
+          },
+          "maxBytes": {
+            "type": "number",
+            "description": "integer 1..32768; UTF-8 JSON bytes; metadata too small explicitly rejected"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "observation-scope",
+      "description": "owner学习范围：默认关闭，只从开启后新提交消息；版本化排除/私密立即撤回，不回扫历史",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "number"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "private": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
       },
       "output": {
         "type": "object",

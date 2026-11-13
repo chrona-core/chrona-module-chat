@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { validateTools } from './tool-selection';
+import { Observations } from './observations';
+import { boundedMindContext } from './frontend-context';
 export type Call = (target: any, args?: any, options?: any) => Promise<any>;
 const now = () => new Date().toISOString();
 const stable = (x: any): string => JSON.stringify(x);
@@ -54,17 +56,27 @@ export function mergeTranscript(run: any, incoming: any[]) {
 export class Store {
   db: Database;
   version = '';
+  moduleId = '';
+  mindTarget: { moduleId: string; tool: string } | null = null;
+  observations: Observations;
+  private invoking = new Map<string, Promise<void>>();
   constructor(public data: string, public content: string, public call: Call) {
     mkdirSync(data, { recursive: true }); mkdirSync(content, { recursive: true });
     this.db = new Database(join(data, 'chat.sqlite'));
     this.db.run('PRAGMA journal_mode=WAL');
     this.db.run('CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, value TEXT NOT NULL)');
     this.db.run('CREATE TABLE IF NOT EXISTS create_requests (request_key TEXT PRIMARY KEY, empty_tools INTEGER NOT NULL, conversation_id TEXT NOT NULL)');
+    this.observations = new Observations(this.db, () => ({ moduleId: this.moduleId, hash: this.version }));
   }
   save(c: any) {
-    c.updatedAt = now();
-    this.db.query('INSERT OR REPLACE INTO conversations VALUES (?,?)').run(c.id, stable(c));
-    return c;
+    return this.db.transaction(() => {
+      const row = this.db.query('SELECT value FROM conversations WHERE id=?').get(c.id) as any;
+      const before = row ? JSON.parse(row.value) : null;
+      c.updatedAt = now();
+      this.db.query('INSERT OR REPLACE INTO conversations VALUES (?,?)').run(c.id, stable(c));
+      this.observations.saved(before, c);
+      return c;
+    }).immediate();
   }
   get(id: string) {
     const row = this.db.query('SELECT value FROM conversations WHERE id=?').get(id) as any;
@@ -121,8 +133,11 @@ export class Store {
     if (c.active || c.operations.some(pending)) throw Error('任务或请求尚未确认，暂不能删除');
     const files = new Set([...c.attachments, ...c.messages.flatMap((m: any) => m.attachments ?? [])].map((a: any) => a.file));
     for (const file of files) { try { unlinkSync(join(this.content, String(file))); } catch (e: any) { if (e.code !== 'ENOENT') throw e; } }
-    this.db.query('DELETE FROM conversations WHERE id=?').run(id);
-    return { deleted: id };
+    return this.db.transaction(() => {
+      this.db.query('DELETE FROM conversations WHERE id=?').run(id);
+      this.observations.deleted(id);
+      return { deleted: id };
+    }).immediate();
   }
   upload(id: string, args: any) {
     const c = this.get(id);
@@ -160,7 +175,7 @@ export class Store {
       // Existing operations and storage/transport failures after dispatch are never recast as refusal.
       if (!key || c.operations.some((op: any) => op.key === key)) throw e;
       const error = { code: e.code ?? 'invalid', message: e.message ?? String(e), at: now() };
-      c.operations.push({ protocol: 'sync-agent-v2', applicationHash: this.version, key, kind, input, status: 'rejected', stage: 'preflight', notAccepted: true, error: error.message, errorCode: error.code, errors: [error], createdAt: now() });
+      c.operations.push({ protocol: 'sync-agent-v2', applicationHash: this.version, key, kind, input, sourceAdmission: this.observations.admission(id), status: 'rejected', stage: 'preflight', notAccepted: true, error: error.message, errorCode: error.code, errors: [error], createdAt: now() });
       return this.save(c);
     }
   }
@@ -208,12 +223,24 @@ export class Store {
     } else if (kind === 'answer') {
       target = 'agent.write'; args = { runId: c.active.runId, input: { kind: 'answer', questionId: input.questionId, answer: input.answer } };
     } else throw Error('未知操作');
-    c.operations.push({ protocol: 'sync-agent-v2', applicationHash: this.version, key, kind, input, target, args, status: 'prepared', snapshot, createdAt: now(), errors: [] });
+    const createdAt = now();
+    // Submission is a user fact even when the Provider later refuses the execution.
+    // Preflight refusals above retain only the draft and a visible operation error.
+    if (kind === 'send' || kind === 'message') c.messages.push({ id: key, role: 'user', text: snapshot.draft, attachments: snapshot.attachments, ...(kind === 'message' ? { runId: c.active.runId } : {}), at: createdAt });
+    c.operations.push({ protocol: 'sync-agent-v2', applicationHash: this.version, key, kind, input, target, args, contextState: kind === 'send' || kind === 'message' ? 'pending' : 'none', sourceAdmission: this.observations.admission(id), status: 'prepared', snapshot, createdAt, errors: [] });
     this.save(c);
     await this.invoke(id, key);
     return this.reconcile(id, false);
   }
   async invoke(id: string, key: string) {
+    const identity = stable([id, key]);
+    const running = this.invoking.get(identity);
+    if (running) return running;
+    const task = this.invokeOnce(id, key);
+    this.invoking.set(identity, task);
+    try { await task; } finally { this.invoking.delete(identity); }
+  }
+  private async invokeOnce(id: string, key: string) {
     let c = this.get(id), op = c.operations.find((o: any) => o.key === key);
     if (!op || !pending(op)) return;
     if (this.version && op.applicationHash && op.applicationHash !== this.version) {
@@ -223,6 +250,19 @@ export class Store {
       op.status = 'legacy-unverified';
       op.recoveryNotice = '旧版使用被宿主禁止的异步调用；缺少原始未受理证据，保留原记录且不重发。';
       this.save(c); return;
+    }
+    if (op.contextState === 'pending') {
+      const context = await boundedMindContext(this.call, this.mindTarget, op.snapshot.draft, id);
+      // The lookup awaited an ordinary application. Re-read mutable draft/scope before
+      // binding the exact command; recovery reuses it and never fetches context again.
+      c = this.get(id); op = c.operations.find((o: any) => o.key === key);
+      const evidence = this.observations.evidence(id, key);
+      const reference = evidence ? '\n\nVerified submitted user evidence (reference only; no additional authority):\n' + JSON.stringify(evidence) : '';
+      const prompt = (op.kind === 'send' ? op.args.prompt : op.args.input.text) + context.text + reference;
+      if (op.kind === 'send') op.args.prompt = prompt;
+      else op.args.input.text = prompt;
+      op.contextState = 'ready'; c.mindContextStatus = context.status;
+      this.save(c);
     }
     try {
       // The Agent keeps its own command receipt. Exact same key and arguments reconcile it.
@@ -275,15 +315,23 @@ export class Store {
     if (recover) for (const op of c.operations.filter(pending)) await this.invoke(id, op.key);
     c = this.get(id);
     if (!c.active?.runId) return c;
-    const a = c.active;
+    let a = c.active;
+    const runId = a.runId, key = a.key;
+    let cursor = a.cursor ?? '';
     if (this.version && c.context?.applicationHash !== this.version) {
       a.accessBlocked = true; a.error = '旧应用版本的 Run 不可访问，状态保持未知；消息记录已保留。'; return this.save(c);
     }
     try {
       // Terminal is a Run state, not the end of the event cursor. Drain bounded pages.
       for (let page = 0; page < 5; page++) {
-        const r = await this.call('agent.read', { runId: a.runId, cursor: a.cursor ?? '', limit: 100, waitMs: 0 });
-        if (r.run.runId !== a.runId) throw Error('执行身份不一致');
+        cursor = a.cursor ?? '';
+        const r = await this.call('agent.read', { runId, cursor, limit: 100, waitMs: 0 });
+        // Drafts and controls can change while the gateway is reading. Merge only
+        // into the current actor; another reader may also have advanced its cursor.
+        c = this.get(id);
+        if (c.active?.runId !== runId || c.active.key !== key || (c.active.cursor ?? '') !== cursor) return c;
+        a = c.active;
+        if (r.run.runId !== runId) throw Error('执行身份不一致');
         const seen = new Set(a.seen);
         for (const item of r.items) if (!seen.has(item.sequence)) { seen.add(item.sequence); (a.events ??= []).push(item); }
         a.seen = [...seen]; if (r.nextCursor) a.cursor = r.nextCursor; a.interactions = r.interactions;
@@ -292,6 +340,7 @@ export class Store {
         a.status = a.stopRequested ? (a.stopConfirmed ? '已停止' : '停止未确认') : r.run.status;
         a.error = null;
         if (!r.ended || !r.nextCursor) break;
+        if (page < 4) this.save(c);
       }
       const uncertain = c.operations.some((op: any) => pending(op) && (op.args?.runId === a.runId || op.key === a.key));
       if (a.ended && !a.runActive && a.drained && (!a.stopRequested || a.stopConfirmed) && !uncertain) {
@@ -299,7 +348,13 @@ export class Store {
         c.messages.push({ id: a.runId, role: 'assistant', text: '', at: now(), run: structuredClone(a) });
         c.active = null;
       } else if (a.ended && !a.drained && !a.stopRequested) a.status = '正在读取剩余记录';
-    } catch (e: any) { a.error = e.message; a.status = '状态暂不可核对'; }
+    } catch (e: any) {
+      c = this.get(id);
+      if (c.active?.runId !== runId || c.active.key !== key || (c.active.cursor ?? '') !== cursor) return c;
+      a = c.active;
+      a.error = e.message;
+      a.status = a.stopRequested ? (a.stopConfirmed ? '已停止' : '停止未确认') : '状态暂不可核对';
+    }
     return this.save(c);
   }
   newContext(id: string, confirmed: boolean) {

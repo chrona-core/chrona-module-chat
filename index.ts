@@ -1,4 +1,4 @@
-import { on, chrona, ModelError } from 'chrona';
+import { on, onDisconnect, chrona, ModelError } from 'chrona';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Store } from './state';
@@ -39,9 +39,10 @@ async function deliveries(c:any){
 on('tool',async event=>{
  const a=event.args as any;let result:any;
  try{
-  if (['read','execute','new-context'].includes(event.id) && !store.version) {
+  if (['read','execute','new-context','observations','snapshot','observation-inventory','observation-scope'].includes(event.id) && !store.version) {
    const modules:any=await chrona.call('modules.list',{limit:100});
-   store.version=modules.items.find((m:any)=>m.name==='chat')?.activeHash??'';
+   const self=modules.items.find((m:any)=>m.name==='chat');
+   store.version=self?.activeHash??''; store.moduleId=self?.id??'';
    if (!store.version) throw Error('无法核对 Chat 当前版本');
   }
   switch(event.id){
@@ -56,7 +57,11 @@ on('tool',async event=>{
    case 'detach':result=store.detach(a.id,a.attachmentId);break;
    case 'new-context':result=store.newContext(a.id,a.confirmed);break;
    case 'image':result=store.image(a.id,a.attachmentId);break;
-   case 'execute':result=await store.operate(a.id,a.key,a.kind,JSON.parse(a.input));break;
+   case 'execute':store.mindTarget=chrona.dependencies.mind?{moduleId:chrona.dependencies.mind,tool:'context'}:null;result=await store.operate(a.id,a.key,a.kind,JSON.parse(a.input));break;
+   case 'observations':result=store.observations.observations(a);break;
+   case 'snapshot':result=store.observations.snapshot(a);break;
+   case 'observation-inventory':result=store.observations.inventory(a);break;
+   case 'observation-scope':result=store.observations.scopeTool(a);break;
    case 'native':{const c=store.get(a.id);const runId=c.active?.runId??[...c.messages].reverse().find((m:any)=>m.run)?.run?.runId;if(!runId)throw Error('需要已有执行；不会为发现配置启动新任务');if(!['get_state','get_available_models'].includes(a.type))throw Error('仅开放原生只读状态/模型查询');result=await chrona.call('agent.native',{runId,request:{type:a.type}},{key:a.key});break;}
    case 'delivery':{const c=store.get(a.id);if(a.receiptId&&!c.deliveries.some((d:any)=>d.receiptId===a.receiptId))c.deliveries.push({receiptId:a.receiptId,state:'待核对用户指定回执'});result=await deliveries(c);break;}
    default:throw Error('未知工具');
@@ -65,6 +70,21 @@ on('tool',async event=>{
  }catch(e:any){console.error(JSON.stringify({component:'chat',event:event.id,error:e.message}));throw new ModelError(e.code??'failed',e.message);}
 });
 on('activated',async()=>{
- const component=await chrona.call<{ type: string }>(dep('web','component-set'),{name:'Workbench',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),props:{type:'object',properties:{},additionalProperties:false},tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context']});
+ // The approved integration observes future sent facts by default; any explicit scope choice wins.
+ const learning=store.observations.scopeTool();if(learning.revision===0&&!learning.enabled)store.observations.scopeTool({expectedRevision:0,enabled:true});
+ const component=await chrona.call<{ type: string }>(dep('web','component-set'),{name:'Workbench',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),props:{type:'object',properties:{},additionalProperties:false},tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope']});
  await chrona.call(dep('web','page-set'),{id:'main',title:'Chat',layout:'workspace',spec:{root:'chat',elements:{chat:{type:component.type,props:{},children:[]}}}});
 });
+
+// Chat remains responsible for observing its own foreground Run after the browser closes.
+// This only reads existing Agent runs; uncertain commands keep their original receipt and are never replayed here.
+let observing=false;
+const observationTimer=setInterval(()=>{if(observing)return;observing=true;void(async()=>{
+ try{
+  const active=store.list().filter((c:any)=>c.active?.runId).slice(0,20);if(!active.length)return;
+  if(!store.version){const directory:any=await chrona.call('modules.list',{limit:100});const self=directory.items.find((m:any)=>m.name==='chat');if(!self?.activeHash)throw Error('Chat active identity unavailable');store.version=self.activeHash;store.moduleId=self.id;}
+  for(const row of active)await store.reconcile(row.id,false);
+ }catch(error){console.error(JSON.stringify({component:'chat',event:'foreground_observation_failed',error:error instanceof Error?error.message.slice(0,500):'unknown'}));}
+ finally{observing=false;}
+})();},10000);
+onDisconnect(()=>{clearInterval(observationTimer);});

@@ -2,8 +2,6 @@
   "schema": 1,
   "source": [
     ".gitignore",
-    "LICENSE",
-    "README.md",
     "browser-check.js",
     "browser-fixture.ts",
     "build.ts",
@@ -14,13 +12,19 @@
     "delivery.ts",
     "dom-checks.ts",
     "dom.test.ts",
+    "frontend-context.ts",
     "host-agent.integration.test.ts",
     "index.ts",
+    "LICENSE",
     "module.json",
+    "observations.bun.test.ts",
+    "observations.ts",
     "package.json",
     "playwright.config.json",
     "race-checks.ts",
     "race.bun.test.ts",
+    "README.md",
+    "reconcile.bun.test.ts",
     "registration-checks.ts",
     "selection-checks.ts",
     "selection.bun.test.ts",
@@ -31,6 +35,7 @@
     "test-support/registration-test.mjs",
     "test.ts",
     "tool-selection.ts",
+    "ui-mind.bun.test.ts",
     "ui.css",
     "ui.ts",
     "web-registration.bun.test.ts"
@@ -38,13 +43,12 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "6cc8b0e70842522190ab515de10cafab14e3604dee0cfe0f3ed1c55cb6e76959"
+      "sha256": "1fe37c1a662eb29f11e493e5d5bfff4b9aaec982801bc58254b7011b66fb556d"
     }
   ],
   "build": {
     "commands": [
-      "bun install --frozen-lockfile --ignore-scripts",
-      "bun run test",
+      "bun install --frozen-lockfile --ignore-scripts --backend=copyfile",
       "bun run build"
     ],
     "toolchain": "bun 1.4.2 (744846f84)",
