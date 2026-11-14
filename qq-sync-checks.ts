@@ -7,6 +7,9 @@ export async function runQqChecks(){
  const caller={kind:'module',module:'qq',moduleId:'qq-id',hash:'hash'},dir=[{name:'qq',id:'qq-id',activeHash:'hash',status:'active'}];
  assertQqCaller(caller,dir);for(const bad of [undefined,{kind:'owner'},{...caller,hash:'stale'},{...caller,moduleId:'fake'}])assert.throws(()=>assertQqCaller(bad,dir));
  const payload={session:'owner:session',messages:[{id:'1',role:'user',text:'你好',at:'2026-01-01T00:00:00Z',progress:''}]};
+ assert.throws(()=>importQq(s,JSON.stringify({...payload,messages:[]})));
+ assert.throws(()=>importQq(s,JSON.stringify({...payload,messages:[payload.messages[0],payload.messages[0]]})));
+ assert.equal(s.list().length,0);
  const first=importQq(s,JSON.stringify(payload));importQq(s,JSON.stringify(payload));assert.equal(s.get(first.id).messages.length,1);
  payload.messages.push({id:'2',role:'assistant',text:'执行中',at:'2026-01-01T00:00:01Z',progress:'running'});importQq(s,JSON.stringify(payload));
  payload.messages[1].text='完成';payload.messages[1].progress='';importQq(s,JSON.stringify(payload));assert.equal(s.get(first.id).messages[1].text,'完成');assert.equal(s.get(first.id).sourceProgress,'');

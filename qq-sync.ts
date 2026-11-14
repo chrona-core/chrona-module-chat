@@ -7,7 +7,9 @@ export function importQq(store:Store,input:string) {
  if(typeof input!=='string'||Buffer.byteLength(input)>4000000)throw Error('QQ 同步数据过大');
  const p=JSON.parse(input);
  if(!p||typeof p.session!=='string'||p.session.length>256||!Array.isArray(p.messages)||p.messages.length>100)throw Error('无效 QQ 会话');
- for(const m of p.messages)if(!m||typeof m.id!=='string'||m.id.length>256||!['user','assistant'].includes(m.role)||typeof m.text!=='string'||m.text.length>200000||typeof m.at!=='string'||!Number.isFinite(Date.parse(m.at))||typeof m.progress!=='string'||m.progress.length>2000)throw Error('无效 QQ 消息');
+ for(const m of p.messages)if(!m||typeof m.id!=='string'||!m.id||m.id.length>256||!['user','assistant'].includes(m.role)||typeof m.text!=='string'||m.text.length>200000||typeof m.at!=='string'||!Number.isFinite(Date.parse(m.at))||typeof m.progress!=='string'||m.progress.length>2000)throw Error('无效 QQ 消息');
+ if(!p.messages.length)throw Error('QQ 同步批次不能为空');
+ if(new Set(p.messages.map((m:any)=>m.id)).size!==p.messages.length)throw Error('QQ 同步批次包含重复消息 ID');
  return store.db.transaction(()=>{
   store.db.run('CREATE TABLE IF NOT EXISTS qq_mirrors (source TEXT PRIMARY KEY, conversation TEXT NOT NULL)');
   let row=store.db.query('SELECT conversation FROM qq_mirrors WHERE source=?').get(p.session) as any;
