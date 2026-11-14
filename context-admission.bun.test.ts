@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Store } from './state';
+import { Store, APPLICATION_DELIVERY_GUIDANCE } from './state';
 
 const mindTarget = { moduleId: 'mind-context-fixture', tool: 'context' };
 const fixtures: { store: Store; dir: string }[] = [];
@@ -43,7 +43,7 @@ for (const mode of ['private', 'excluded', 'global-off'] as const) {
     const result = await f.store.operate(f.id, 'private-command', kind, kind === 'message' ? { text: 'supplement-private-marker' } : {});
     expect(f.mindCalls()).toEqual([]);
     const call = f.calls.findLast(call => call.target === (kind === 'send' ? 'agent.run' : 'agent.write'))!;
-    expect(kind === 'send' ? call.args.prompt : call.args.input.text).toBe(kind === 'send' ? 'submitted-private-marker' : 'supplement-private-marker');
+    expect(kind === 'send' ? call.args.prompt : call.args.input.text).toBe((kind === 'send' ? 'submitted-private-marker' : 'supplement-private-marker') + APPLICATION_DELIVERY_GUIDANCE);
     expect(call.options).toEqual({ key: 'private-command' });
     expect(result.operations.at(-1).status).toBe('succeeded');
     expect(result.mindContextStatus).toContain('已跳过');
@@ -102,7 +102,7 @@ for (const originallyAdmitted of [false, true]) test(`pending recovery cannot ga
   f.store.invoke = invoke;
   const result = await f.store.operate(f.id, 'held-command', 'send', {});
   expect(f.mindCalls()).toEqual([]);
-  expect(f.calls.find(call => call.target === 'agent.run')!.args.prompt).toBe('submitted-private-marker');
+  expect(f.calls.find(call => call.target === 'agent.run')!.args.prompt).toBe('submitted-private-marker' + APPLICATION_DELIVERY_GUIDANCE);
   expect(result.operations[0].status).toBe('succeeded');
   expect(result.mindContextStatus).toContain('已跳过');
 });
@@ -117,7 +117,7 @@ test('withdrawal before the deferred Mind dispatch prevents the call itself', as
   };
   const result = await f.store.operate(f.id, 'withdraw-before-dispatch', 'send', {});
   expect(f.mindCalls()).toEqual([]);
-  expect(f.calls.find(call => call.target === 'agent.run')!.args.prompt).toBe('submitted-private-marker');
+  expect(f.calls.find(call => call.target === 'agent.run')!.args.prompt).toBe('submitted-private-marker' + APPLICATION_DELIVERY_GUIDANCE);
   expect(result.operations[0].status).toBe('succeeded');
   expect(result.mindContextStatus).toContain('已跳过');
 });
@@ -136,7 +136,7 @@ test('scope withdrawal during context lookup discards its result and preserves c
   release({ json: '{"facts":["withdrawn-context-marker"]}' });
   const result = await pending;
   expect(f.mindCalls()).toHaveLength(1);
-  expect(f.calls.find(call => call.target === 'agent.run')!.args.prompt).toBe('submitted-private-marker');
+  expect(f.calls.find(call => call.target === 'agent.run')!.args.prompt).toBe('submitted-private-marker' + APPLICATION_DELIVERY_GUIDANCE);
   expect(result.draft).toBe('concurrent unsent edit');
   expect(result.mindContextStatus).toContain('已跳过');
   expect(f.store.observations.evidence(f.id, 'withdrawn-command')).toBeNull();

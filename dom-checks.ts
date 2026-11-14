@@ -16,7 +16,7 @@ export async function runDomChecks() {
   }
   const directory=mkdtempSync(join(tmpdir(),'chat-dom-'));let destroy:any;
   let stopped=false,holdStop=false,releaseStop:any,loseMessage=true;
-  const keys:any[]=[];const replies=new Map();
+  const keys:any[]=[];const replies=new Map();let mindUpdates:any[]=[],observedReads=0;
   const store=new Store(join(directory,'data'),join(directory,'content'),async(t,a,o)=>{
     if(o?.mode==='async')throw Object.assign(Error('Agent is synchronous'),{code:'invalid'});
     if(t==='agent.providers')return {items:[{id:'pi',available:true,hash:'h',revision:'v',capabilities:{conversation:true,images:true}}]};
@@ -32,7 +32,7 @@ export async function runDomChecks() {
       case 'catalog':await new Promise(r=>setTimeout(r,30));result=catalog;break;
       case 'list':result={items:store.list()};break;
       case 'create':result=store.create('pi');break;
-      case 'read':result=await store.reconcile(a.id);break;
+      case 'read':if(a.observe)observedReads++;result={...await store.reconcile(a.id,a.observe!==true),mindUpdates};break;
       case 'draft':result=store.draft(a.id,JSON.parse(a.patch),a.revision);break;
       case 'execute':keys.push(a);result=await store.operate(a.id,a.key,a.kind,JSON.parse(a.input));if(a.kind==='message'&&loseMessage){loseMessage=false;throw Error('accepted HTTP reply lost');}if(a.kind==='stop'&&holdStop)await new Promise(r=>releaseStop=r);break;
       default:throw Error('unexpected DOM tool '+name);
@@ -58,7 +58,17 @@ export async function runDomChecks() {
     type('new draft while stop reply is delayed');releaseStop();await wait(()=>q('.chat-stop').hidden);
     assert.equal(q('textarea').value,'new draft while stop reply is delayed');
     assert.equal(JSON.parse(window.localStorage.getItem('chat.draft.'+store.list()[0].id)!).text,'new draft while stop reply is delayed');
+    const commandCount=keys.length;
+    mindUpdates=[{id:'goal',status:'waiting',goal:'交付应用中心',waitReason:'缺少实际材料接口',nextStep:'任务负责人补齐后继续'}];
+    q('[data-action=refresh]').click();await wait(()=>q('.chat-mind-updates').textContent.includes('缺少实际材料接口'));
+    assert.equal(q('.chat-mind-updates').getAttribute('role'),'status');assert.equal(keys.length,commandCount);
+    assert.equal(q('.chat-messages').textContent.includes('缺少实际材料接口'),false);
+    mindUpdates=[];q('[data-action=refresh]').click();await wait(()=>q('.chat-mind-updates').hidden);
     const d=new Drafts(window.localStorage as any),ops=new Operations(window.localStorage as any);
+    const idle=store.list()[0].id,unreceived=ops.begin(idle,'send',{},null),beforePoll=observedReads;
+    await new Promise(r=>setTimeout(r,2200));
+    assert.ok(observedReads>beforePoll);assert.equal(keys.length,commandCount);assert.equal(ops.read(idle)?.key,unreceived.key);
+    ops.settle(idle,{operations:[{key:unreceived.key,status:'failed'}]},d);
     const old=d.edit('isolated','old'),op=ops.begin('isolated','message',{text:'old'},old.token);d.edit('isolated','new');
     ops.settle('isolated',{operations:[{key:op.key,status:'succeeded'}]},d);assert.equal(d.read('isolated').text,'new');
     let unblock:any;const uploaded:any[]=[];
@@ -68,7 +78,7 @@ export async function runDomChecks() {
     const receipt={receiptId:'receipt',requestKey:'key',members:[{moduleId:'m',hash:'a'.repeat(40)}]};
     const found=submittedReceipts({messages:[{run:{transcript:[{kind:'result',tool:'m_author_submit',text:JSON.stringify({result:receipt}),error:false}]}}],deliveries:[]});assert.equal(found.length,1);
     const empty=store.create('pi');const blank=ops.begin(empty.id,'send',{},null);const rejected=await store.operate(empty.id,blank.key,'send',{});ops.settle(empty.id,rejected,d);assert.equal(ops.read(empty.id),null);
-    return {checks:10,details:['initialization disabled','default Provider ready','real UI+Store synchronous send','same-key supplemental HTTP loss','late stop does not erase draft or recovery copy','acknowledged token only','upload origin fixed','actual m_author_submit receipt','native dialog controls']};
+    return {checks:11,details:['initialization disabled','default Provider ready','real UI+Store synchronous send','same-key supplemental HTTP loss','late stop does not erase draft or recovery copy','acknowledged token only','upload origin fixed','actual m_author_submit receipt','native dialog controls']};
   }finally{
     destroy?.();store.close();rmSync(directory,{recursive:true,force:true});await window.happyDOM.close();
     for(const [key,descriptor] of previous)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete (globalThis as any)[key];

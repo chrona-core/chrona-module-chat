@@ -17,6 +17,8 @@
     "host-agent.integration.test.ts",
     "index.ts",
     "LICENSE",
+    "mind-updates.bun.test.ts",
+    "mind-updates.ts",
     "module.json",
     "observations.bun.test.ts",
     "observations.ts",
@@ -44,7 +46,7 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "1fe37c1a662eb29f11e493e5d5bfff4b9aaec982801bc58254b7011b66fb556d"
+      "sha256": "7d339243190e785018bc43909c5f22756075e62e80744171f9ae91bfbd501875"
     }
   ],
   "build": {

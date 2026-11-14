@@ -26,7 +26,8 @@
     "web.pages",
     "pi.configure",
     "pi.models",
-    "mind.context"
+    "mind.context",
+    "mind.updates"
   ],
   "tests": [
     "test.ts"
@@ -119,7 +120,7 @@
     },
     {
       "name": "read",
-      "description": "核对已有执行及读取会话",
+      "description": "核对已有执行及读取会话；observe=true 仅观测，不恢复待执行命令",
       "visibility": [
         "owner"
       ],
@@ -129,6 +130,9 @@
         "properties": {
           "id": {
             "type": "string"
+          },
+          "observe": {
+            "type": "boolean"
           }
         },
         "required": [
