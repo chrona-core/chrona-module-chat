@@ -2,6 +2,7 @@ import { on, onDisconnect, chrona, ModelError } from 'chrona';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Store } from './state';
+import { assertQqCaller, importQq } from './qq-sync';
 import { submittedReceipts } from './delivery';
 import { readMindUpdates } from './mind-updates';
 import { discoverTools, defaultTools, TOOL_LIMIT } from './tool-selection';
@@ -47,6 +48,7 @@ on('tool',async event=>{
    if (!store.version) throw Error('无法核对 Chat 当前版本');
   }
   switch(event.id){
+   case 'qq-sync':{const directory:any=await chrona.call('modules.list',{limit:100});assertQqCaller(event.caller,directory.items);result=importQq(store,a.input);break;}
    case 'catalog':result=await catalog();break;
    case 'list':result={items:store.list()};break;
    case 'create':{result=store.created(a.requestKey,a.emptyTools===true);if(result)break;const p=await chrona.call('agent.providers',{}) as ProviderList;const available=p.items.filter(p=>p.available&&p.capabilities.conversation);result=store.create(available.length===1?available[0].id:'',a.emptyTools === true ? [] : defaultTools(await discoverTools(chrona.call)),a.requestKey,a.emptyTools===true);break;}

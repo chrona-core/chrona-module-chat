@@ -122,7 +122,8 @@ export class Observations {
   /** Call after the main record write in the SAME transaction. Comparing before/after
    * admits new persisted facts only; enabling never enumerates historical messages. */
   saved(before: any, after: any) {
-    if (!this.allowed(after.id)) return;
+    // QQ mirror authorization is display-only, not permission to widen Mind sources.
+    if (after.source === 'qq' || !this.allowed(after.id)) return;
     const meta = this.meta(), priorMessages = new Map((before?.messages ?? []).map((m: any) => [m.id, m]));
     for (const m of after.messages) {
       if (!m.id || !['user', 'assistant'].includes(m.role)) continue;
