@@ -2,6 +2,8 @@
   "schema": 1,
   "source": [
     ".gitignore",
+    "LICENSE",
+    "README.md",
     "browser-check.js",
     "browser-fixture.ts",
     "build.ts",
@@ -16,7 +18,6 @@
     "frontend-context.ts",
     "host-agent.integration.test.ts",
     "index.ts",
-    "LICENSE",
     "mind-updates.bun.test.ts",
     "mind-updates.ts",
     "module.json",
@@ -26,7 +27,6 @@
     "playwright.config.json",
     "race-checks.ts",
     "race.bun.test.ts",
-    "README.md",
     "reconcile.bun.test.ts",
     "registration-checks.ts",
     "selection-checks.ts",
@@ -34,27 +34,29 @@
     "state-checks.ts",
     "state.test.ts",
     "state.ts",
-    "test-support/host-style.css",
-    "test-support/registration-test.mjs",
     "test.ts",
     "tool-selection.ts",
     "ui-mind.bun.test.ts",
     "ui.css",
     "ui.ts",
-    "web-registration.bun.test.ts"
+    "web-registration.bun.test.ts",
+    "qq-sync.ts",
+    "qq-sync-checks.ts",
+    "test-support/host-style.css",
+    "test-support/registration-test.mjs"
   ],
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "7d339243190e785018bc43909c5f22756075e62e80744171f9ae91bfbd501875"
+      "sha256": "677cc4ab1c0084dda6d6968a6c1bd06f9a190be719ffb39144d54f9aba302a50"
     }
   ],
   "build": {
     "commands": [
-      "bun install --frozen-lockfile --ignore-scripts --backend=copyfile",
-      "bun run build"
+      "bun install --frozen-lockfile",
+      "bun run build.ts"
     ],
-    "toolchain": "bun 1.4.2 (744846f84)",
-    "target": "browser JavaScript; Chrona TypeScript host"
+    "toolchain": "Bun 1.4.2; current host Chrona SDK",
+    "target": "linux x64 Chrona module; browser ESM"
   }
 }

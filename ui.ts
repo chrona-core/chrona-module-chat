@@ -49,6 +49,14 @@ export default function mount(element: HTMLElement, { call }: any) {
     $('[data-action="delete"]').disabled = !!c.active || !!pending;
     $('.chat-badge').textContent = c.active ? (c.active.stopRequested ? (c.active.ended ? '已结束 · 停止未知' : '停止待确认') : c.active.ended ? '读取记录' : '执行中') : hasProvider ? '可开始对话' : '请选择提供方';
     $('.chat-compose-hint').textContent = navigator.onLine === false ? '当前离线 · 草稿保留在本机，联网后核对保存再发送' : pending ? '请求待确认 · 在执行详情中核对原请求' : c.active ? '可继续输入补充指令 · 模型设置用于下一轮' : hasProvider ? 'Ctrl / ⌘ + Enter 发送' : '在工具与设置中选择可用的对话提供方';
+    if(c.readOnly){
+      text.disabled=true;text.placeholder='请在 QQ 中继续对话';
+      $('.chat-upload input').disabled=true;$('.chat-send').disabled=true;
+      $('.chat-model').disabled=true;$('.chat-thinking').disabled=true;
+      for(const action of ['settings','new-context'])$('[data-action="'+action+'"]').disabled=true;
+      $('.chat-badge').textContent=c.sourceProgress?'QQ · 执行中':'QQ · 只读同步';
+      $('.chat-compose-hint').textContent='仅同步接入后的私聊消息 · 在 QQ 中回复 · 附件请在 QQ 查看';
+    }else text.placeholder='输入消息…';
   }
   function adopt(id: string, next: any) {
     operations.settle(id, next, drafts);

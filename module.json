@@ -595,7 +595,8 @@
                 "enum": [
                   "message",
                   "operation",
-                  "conversation"
+                  "conversation",
+                  "execution"
                 ]
               },
               "id": {
@@ -713,6 +714,37 @@
           }
         },
         "required": []
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "json": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "json"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "qq-sync",
+      "description": "仅当前 QQ 应用可写入私聊只读镜像；不执行模型，不转发消息。",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
       },
       "output": {
         "type": "object",
