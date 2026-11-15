@@ -595,7 +595,8 @@
                 "enum": [
                   "message",
                   "operation",
-                  "conversation"
+                  "conversation",
+                  "execution"
                 ]
               },
               "id": {
