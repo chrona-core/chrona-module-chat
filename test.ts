@@ -10,8 +10,6 @@ import { runRegistrationChecks } from './registration-checks';
 import { runRaceChecks } from './race-checks';
 import { runSelectionChecks } from './selection-checks';
 import { runCreateChecks } from './create-checks';
-import { runQqChecks } from './qq-sync-checks';
-assert.equal(await runQqChecks(),true);
 assert.equal(await runStateChecks(),15);
 assert.equal((await runDomChecks()).checks,11);
 assert.equal((await runRaceChecks()).checks,7);

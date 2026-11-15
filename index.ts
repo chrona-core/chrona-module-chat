@@ -2,9 +2,9 @@ import { on, onDisconnect, chrona, ModelError } from 'chrona';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Store } from './state';
-import { assertQqCaller, importQq } from './qq-sync';
 import { submittedReceipts } from './delivery';
 import { readMindUpdates } from './mind-updates';
+import { mindTaskCall } from './mind-tasks';
 import { discoverTools, defaultTools, TOOL_LIMIT } from './tool-selection';
 // Describe the provider fields consumed by Chat in both source and generated SDK builds.
 type ProviderList = { items: { id: string; name: string; moduleId: string; configuration?: { tool: string }; available: boolean; capabilities: { conversation: boolean } }[] };
@@ -48,9 +48,9 @@ on('tool',async event=>{
    if (!store.version) throw Error('无法核对 Chat 当前版本');
   }
   switch(event.id){
-   case 'qq-sync':{const directory:any=await chrona.call('modules.list',{limit:100});assertQqCaller(event.caller,directory.items);result=importQq(store,a.input);break;}
    case 'catalog':result=await catalog();break;
    case 'list':result={items:store.list()};break;
+   case 'task-view':case 'task-control':result=await mindTaskCall((target,args)=>chrona.call(target,args),chrona.dependencies,event.caller,event.id,a);break;
    case 'create':{result=store.created(a.requestKey,a.emptyTools===true);if(result)break;const p=await chrona.call('agent.providers',{}) as ProviderList;const available=p.items.filter(p=>p.available&&p.capabilities.conversation);result=store.create(available.length===1?available[0].id:'',a.emptyTools === true ? [] : defaultTools(await discoverTools(chrona.call)),a.requestKey,a.emptyTools===true);break;}
    case 'read':{
     const conversation=await store.reconcile(a.id,a.observe!==true),admission=store.observations.admission(a.id);
@@ -81,7 +81,7 @@ on('tool',async event=>{
 on('activated',async()=>{
  // The approved integration observes future sent facts by default; any explicit scope choice wins.
  const learning=store.observations.scopeTool();if(learning.revision===0&&!learning.enabled)store.observations.scopeTool({expectedRevision:0,enabled:true});
- const component=await chrona.call<{ type: string }>(dep('web','component-set'),{name:'Workbench',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),props:{type:'object',properties:{},additionalProperties:false},tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope']});
+ const component=await chrona.call<{ type: string }>(dep('web','component-set'),{name:'Workbench',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),props:{type:'object',properties:{},additionalProperties:false},tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope','task-view','task-control']});
  await chrona.call(dep('web','page-set'),{id:'main',title:'Chat',layout:'workspace',spec:{root:'chat',elements:{chat:{type:component.type,props:{},children:[]}}}});
 });
 

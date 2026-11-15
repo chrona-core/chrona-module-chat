@@ -2,6 +2,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { Drafts, DraftConflicts, Operations, uploadFiles } from './client-state';
 import { targetKey, defaultTools } from './tool-selection';
+import { mountTasks } from './tasks-ui';
 export default function mount(element: HTMLElement, { call }: any) {
   const root = document.createElement('div'); root.className = 'chat-workbench'; element.append(root);
   root.innerHTML = `<aside class="chat-sidebar" aria-label="会话"><div class="chat-brand"><b>Chat</b><button data-action="drawer" class="chat-close" aria-label="关闭会话列表">×</button></div><button class="chat-new" data-action="new">＋ 新对话</button><button type="button" data-action="new-empty" hidden>新对话（关闭工具后手动选择）</button><input class="chat-search" type="search" placeholder="搜索会话" aria-label="搜索会话"><nav aria-label="会话列表"></nav><label class="chat-checkbox"><input class="chat-archive" type="checkbox">查看已归档</label></aside><div class="chat-main"><div class="chat-toolbar"><button class="chat-drawer" data-action="drawer" aria-label="打开会话列表">☰</button><h1>Chat</h1><span class="chat-badge">正在加载</span><details class="chat-more"><summary aria-label="更多会话操作">•••</summary><div><button data-action="rename">重命名</button><button data-action="pin">置顶</button><button data-action="archive">归档</button><button data-action="settings">工具与设置</button><button data-action="mind-scope">Mind 学习范围</button><button data-action="delivery">应用交付</button><button data-action="diagnostics">执行详情</button><button data-action="new-context">新执行上下文</button><button data-action="delete">删除会话</button></div></details></div><div class="chat-alert" role="status" hidden></div><div class="chat-alert chat-mind-context" role="status" hidden></div><div class="chat-mind-updates chat-alert" role="status" aria-atomic="true" hidden></div><div class="chat-messages" tabindex="0" aria-label="消息记录"></div><div class="chat-questions"></div><div class="chat-compose"><div class="chat-attachments"></div><textarea rows="2" aria-label="消息" placeholder="输入消息…" disabled></textarea><div class="chat-compose-bar"><label class="chat-upload" aria-label="添加图片">＋<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden disabled></label><select class="chat-model" aria-label="下一轮模型" disabled></select><select class="chat-thinking" aria-label="下一轮思考强度" disabled></select><button class="chat-tools-button" data-action="settings">工具</button><span class="chat-spacer"></span><button class="chat-stop" data-action="stop" hidden>停止</button><button class="chat-send" data-action="send" disabled>发送 ↑</button></div><div class="chat-compose-hint"></div></div></div><dialog class="chat-settings" aria-label="工具与设置"><h2 tabindex="-1" autofocus>工具与设置</h2><p>这里的更改用于下一轮，运行中的配置保留不变。</p><label class="chat-field">对话提供方<select class="chat-provider"></select></label><p class="chat-config-warning"></p><h3>应用工具</h3><p>新会话默认开启当前全部可委派应用工具。已有会话保留选择，新增工具需手动开启。内核每轮最多100个；超过时请手动选择。</p><button type="button" data-action="tools-all">全部开启</button><button type="button" data-action="tools-none">全部关闭</button><p class="chat-tool-notice" role="status"></p><input class="chat-tool-search" type="search" placeholder="搜索工具及用途" aria-label="搜索工具"><div class="chat-tools"></div><p class="chat-subtle">权限以内核为准。未选应用工具仍可能使用提供方自带的文件和 shell 能力。</p><form method="dialog"><button>完成</button></form></dialog><dialog class="chat-context-confirm" aria-label="新执行上下文"><h2>开始新执行上下文？</h2><p>保留 Chat 消息，后续执行不续接旧 Provider 上下文；不会重发未知请求。</p><form method="dialog"><button value="cancel" autofocus>取消</button><button value="create">开始</button></form></dialog><dialog class="chat-confirm" aria-label="删除会话"><h2>删除这段对话？</h2><p>只删除此 Chat 会话和附件，无法撤销。</p><form method="dialog"><button value="cancel" autofocus>取消</button><button value="delete">删除</button></form></dialog><dialog class="chat-rename" aria-label="重命名会话"><h2>重命名</h2><form method="dialog"><input name="title" aria-label="会话名称" maxlength="120" required autofocus><button value="cancel" formnovalidate>取消</button><button value="save">保存</button></form></dialog><dialog class="chat-delivery" aria-label="应用交付"><h2 tabindex="-1" autofocus>应用交付</h2><p>提交、批准、激活与浏览器验收分别核对。</p><div class="chat-delivery-items"></div><details><summary>按精确回执核对</summary><input class="chat-receipt" placeholder="receiptId" aria-label="精确回执ID"><button data-action="check-delivery">核对回执</button></details><form method="dialog"><button>关闭</button></form></dialog><dialog class="chat-diagnostics" aria-label="执行详情"><h2 tabindex="-1" autofocus>执行详情</h2><p class="chat-recovery-note"></p><button data-action="refresh">按原请求核对</button><details><summary>原始执行记录</summary><pre></pre></details><form method="dialog"><button>关闭</button></form></dialog>`;
@@ -21,6 +22,7 @@ export default function mount(element: HTMLElement, { call }: any) {
     if (dead) throw Error('组件已卸载');
     return JSON.parse(result.json);
   };
+  const taskViews = mountTasks(root, api, (id, stillSelected) => select(id, true, stillSelected), () => { if (c) draw(); else { $('.chat-toolbar h1').textContent = 'Chat'; lock(); } });
   function alert(message = '') { if (!dead) { $('.chat-alert').textContent = message; $('.chat-alert').hidden = !message; } }
   function fail(e: any) { alert((conflicts.read(c?.id) ? conflictMessage + '\n' : '') + (e.message ?? String(e))); }
   const task = (fn: () => Promise<any>) => fn().catch(fail);
@@ -47,16 +49,8 @@ export default function mount(element: HTMLElement, { call }: any) {
     root.querySelectorAll<HTMLInputElement>('.chat-questions button,.chat-questions input,.chat-questions select,.chat-questions textarea').forEach(b => b.disabled = busy || !!pending || !!c.active?.ended);
     $('.chat-model').disabled = !ready; $('.chat-thinking').disabled = !ready;
     $('[data-action="delete"]').disabled = !!c.active || !!pending;
-    $('.chat-badge').textContent = c.active ? (c.active.stopRequested ? (c.active.ended ? '已结束 · 停止未知' : '停止待确认') : c.active.ended ? '读取记录' : '执行中') : hasProvider ? '可开始对话' : '请选择提供方';
+    if (!taskViews.selected) $('.chat-badge').textContent = c.active ? (c.active.stopRequested ? (c.active.ended ? '已结束 · 停止未知' : '停止待确认') : c.active.ended ? '读取记录' : '执行中') : hasProvider ? '可开始对话' : '请选择提供方';
     $('.chat-compose-hint').textContent = navigator.onLine === false ? '当前离线 · 草稿保留在本机，联网后核对保存再发送' : pending ? '请求待确认 · 在执行详情中核对原请求' : c.active ? '可继续输入补充指令 · 模型设置用于下一轮' : hasProvider ? 'Ctrl / ⌘ + Enter 发送' : '在工具与设置中选择可用的对话提供方';
-    if(c.readOnly){
-      text.disabled=true;text.placeholder='请在 QQ 中继续对话';
-      $('.chat-upload input').disabled=true;$('.chat-send').disabled=true;
-      $('.chat-model').disabled=true;$('.chat-thinking').disabled=true;
-      for(const action of ['settings','new-context'])$('[data-action="'+action+'"]').disabled=true;
-      $('.chat-badge').textContent=c.sourceProgress?'QQ · 执行中':'QQ · 只读同步';
-      $('.chat-compose-hint').textContent='仅同步接入后的私聊消息 · 在 QQ 中回复 · 附件请在 QQ 查看';
-    }else text.placeholder='输入消息…';
   }
   function adopt(id: string, next: any) {
     operations.settle(id, next, drafts);
@@ -129,12 +123,13 @@ export default function mount(element: HTMLElement, { call }: any) {
       await select(created.id); await refreshList(); text.focus();
     } finally { creating = false; }
   }
-  async function select(id: string) {
+  async function select(id: string, fromTask = false, stillSelected = () => true) {
+    if (!fromTask) taskViews.close();
     const generation = ++selectionGeneration;
     try { await flush(); } catch (e) { fail(e); } // Recovery reads must bypass failed saves.
-    if (generation !== selectionGeneration) return;
+    if (generation !== selectionGeneration || !stillSelected()) return;
     const next = await api('read', { id });
-    if (generation !== selectionGeneration) return;
+    if (generation !== selectionGeneration || !stillSelected()) return;
     if (c?.id === id) adopt(id, next);
     else { c = next; operations.settle(id, next, drafts); text.value = drafts.value(id, next.draft); }
     const route = new URL(window.location.href); route.searchParams.set('conversation', id);
@@ -207,7 +202,7 @@ export default function mount(element: HTMLElement, { call }: any) {
   }
   function draw() {
     if (!c) { lock(); return; }
-    $('.chat-toolbar h1').textContent = c.title;
+    if (!taskViews.selected) $('.chat-toolbar h1').textContent = c.title;
     $('.chat-mind-context').textContent = c.mindContextStatus ? String(c.mindContextStatus) : '';
     $('.chat-mind-context').hidden = !c.mindContextStatus;
     const updates = $('.chat-mind-updates');
@@ -368,7 +363,7 @@ export default function mount(element: HTMLElement, { call }: any) {
         case 'tools-all': c.settings.tools = defaultTools(catalog.tools); await saveSettings(); tools(); break;
         case 'tools-none': c.settings.tools = []; await saveSettings(); tools(); break;
         case 'new': case 'new-empty': await createConversation(action === 'new-empty'); break;
-        case 'drawer': drawer = !drawer; root.classList.toggle('chat-drawer-open', drawer); if (drawer) $('.chat-search').focus(); break;
+        case 'drawer': drawer = !root.classList.contains('chat-drawer-open'); root.classList.toggle('chat-drawer-open', drawer); if (drawer) $('.chat-search').focus(); break;
         case 'send': await execute(c.active ? 'message' : 'send', { text: text.value }); break;
         case 'stop': await execute('stop'); break;
         case 'settings': settings(); break;
@@ -400,7 +395,11 @@ export default function mount(element: HTMLElement, { call }: any) {
   };
   text.onkeydown = (e: KeyboardEvent) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); $('.chat-send').click(); } };
   root.addEventListener('keydown', e => { if (e.key === 'Escape' && drawer) { drawer = false; root.classList.remove('chat-drawer-open'); $('.chat-drawer').focus(); } });
-  const interval = setInterval(() => { if (dead || !ready || !c || polling || busy || document.hidden) return; polling = true; task(() => refresh(true)).finally(() => { polling = false; }); }, 2000);
+  const interval = setInterval(() => {
+    if (dead || !ready || polling || busy || document.hidden) return;
+    polling = true;
+    task(async () => { await refresh(true); await taskViews.refresh(); }).finally(() => { polling = false; });
+  }, 2000);
   const offline = () => lock();
   const reconnect = () => { lock(); task(refresh); }; window.addEventListener('online', reconnect); window.addEventListener('offline', offline);
   lock();
@@ -421,6 +420,8 @@ export default function mount(element: HTMLElement, { call }: any) {
       else messages.textContent = '点击“新对话”开始。';
     }
     ready = true; lock();
+    await taskViews.refresh();
+    if (url.searchParams.has('task')) await taskViews.select(url.searchParams.get('task')!);
   });
-  return () => { dead = true; clearInterval(interval); clearTimeout(saveTimer); window.removeEventListener('resize', height); window.visualViewport?.removeEventListener('resize', height); window.removeEventListener('online', reconnect); window.removeEventListener('offline', offline); root.querySelectorAll('dialog').forEach(d => d.close()); root.remove(); };
+  return () => { dead = true; taskViews.destroy(); clearInterval(interval); clearTimeout(saveTimer); window.removeEventListener('resize', height); window.visualViewport?.removeEventListener('resize', height); window.removeEventListener('online', reconnect); window.removeEventListener('offline', offline); root.querySelectorAll('dialog').forEach(d => d.close()); root.remove(); };
 }

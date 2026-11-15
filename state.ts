@@ -108,7 +108,6 @@ export class Store {
   }
   draft(id: string, patch: any, revision: number) {
     const c = this.get(id);
-    if(c.readOnly)throw Error('QQ 来源会话只读，请在 QQ 中回复');
     if (!Number.isInteger(revision) || c.revision !== revision) throw Error('草稿已在其他窗口更新，请核对后编辑');
     if (typeof patch.draft === 'string') c.draft = patch.draft.slice(0, 200000);
     if (patch.settings) {
@@ -143,7 +142,6 @@ export class Store {
   }
   upload(id: string, args: any) {
     const c = this.get(id);
-    if(c.readOnly)throw Error('QQ 来源会话只读');
     if (c.attachments.length >= 10) throw Error('最多10个附件');
     const types: any = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
     if (!types[args.mime]) throw Error('仅支持 PNG、JPEG、GIF、WebP；PDF 不支持自动解析');
@@ -171,7 +169,6 @@ export class Store {
     return { mime: a.mime, base64: readFileSync(join(this.content, a.file)).toString('base64') };
   }
   async operate(id: string, key: string, kind: string, input: any) {
-    if(this.get(id).readOnly)throw Error('QQ 来源会话只读，请在 QQ 中回复');
     try { return await this.perform(id, key, kind, input); }
     catch (e: any) {
       const c = this.get(id);
@@ -371,7 +368,6 @@ export class Store {
   }
   newContext(id: string, confirmed: boolean) {
     const c = this.get(id);
-    if(c.readOnly)throw Error('QQ 来源会话只读');
     if (!confirmed || c.active || c.operations.some(pending)) throw Error('仍有未确认执行，不能切换上下文');
     c.context = null; c.contextNotice = '已显式开始新执行上下文，保留 Chat 消息；旧 Provider 上下文不会续接。';
     return this.save(c);
