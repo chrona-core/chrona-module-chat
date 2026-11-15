@@ -18,6 +18,7 @@
     "frontend-context.ts",
     "host-agent.integration.test.ts",
     "index.ts",
+    "mind-tasks.ts",
     "mind-updates.bun.test.ts",
     "mind-updates.ts",
     "module.json",
@@ -34,29 +35,29 @@
     "state-checks.ts",
     "state.test.ts",
     "state.ts",
+    "tasks-ui.ts",
+    "tasks.bun.test.ts",
+    "test-support/host-style.css",
+    "test-support/registration-test.mjs",
     "test.ts",
     "tool-selection.ts",
     "ui-mind.bun.test.ts",
     "ui.css",
     "ui.ts",
-    "web-registration.bun.test.ts",
-    "qq-sync.ts",
-    "qq-sync-checks.ts",
-    "test-support/host-style.css",
-    "test-support/registration-test.mjs"
+    "web-registration.bun.test.ts"
   ],
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "677cc4ab1c0084dda6d6968a6c1bd06f9a190be719ffb39144d54f9aba302a50"
+      "sha256": "09d32944b8a84b4a5c3ff3668338bc306eced964ea3ca7c171133a518c2f875d"
     }
   ],
   "build": {
     "commands": [
-      "bun install --frozen-lockfile",
-      "bun run build.ts"
+      "bun install --frozen-lockfile --ignore-scripts --backend=copyfile",
+      "bun run build"
     ],
-    "toolchain": "Bun 1.4.2; current host Chrona SDK",
-    "target": "linux x64 Chrona module; browser ESM"
+    "toolchain": "bun 1.4.2 (744846f84)",
+    "target": "browser JavaScript; Chrona TypeScript host"
   }
 }
