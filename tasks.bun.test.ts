@@ -3,10 +3,10 @@ import {Window} from 'happy-dom';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {CoreMindStore,evidenceId} from '../mind/core-store';
-import {CoreMindService} from '../mind/core-service';
-import {CoreActions} from '../mind/core-actions';
-import {CoreTaskView,taskOwnerAccess} from '../mind/core-task-view';
+import {CoreMindStore,evidenceId} from '../chrona-module-mind/core-store';
+import {CoreMindService} from '../chrona-module-mind/core-service';
+import {CoreActions} from '../chrona-module-mind/core-actions';
+import {CoreTaskView,taskOwnerAccess} from '../chrona-module-mind/core-task-view';
 import {mindTaskCall} from './mind-tasks';
 const wait=async(check:()=>boolean)=>{for(let i=0;i<200;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('Task UI condition timeout');};
 

@@ -1,11 +1,5 @@
-# chat 开发与离线检查
+# chat 源码与检查
 
-此仓库拥有应用源码、许可证、构建输入、锁、材料和测试。无已核验远端，仅本地 main。
+本仓库维护应用源码及应用私有测试。Chrona 主仓只提供通用 kernel、宿主、CLI、SDK 与合同；不再保存应用源码、应用共享业务包或固定应用副本。应用间组合测试放在拥有者的 `integration/`，使用同级 `chrona-module-*` checkout；通用 kernel/宿主测试依赖使用同级 `Chrona/` checkout。这些路径用于开发组合，不是自动安装或运行应用的入口。
 
-应用纯逻辑使用 Bun；涉及 kernel、DB、SDK 或其他应用的测试在 Chrona 的锁定组合中执行。Chrona 通过 `bun run applications:restore` 从固定 bundle 与精确 artifact 输入恢复 `packages/engine/src/modules/steward/applications/chat`，不读取同级 checkout。恢复目录与原目录保持相对深度，使既有组合测试继续使用真实 SDK 与临时数据库。
-
-在 Chrona 根运行 `bun run test:bun packages/engine/src/modules/steward/applications/chat/<file>.bun.test.ts`；测试 wrapper、浏览器入口与宿主集成逐文件映射见 Chrona `docs/tasks/cleanup-and-reorg/stage-4-test-mapping.json`。独立纯逻辑测试也可在本仓库 `bun test <file>`，宿主组合测试不在此承诺独立运行。
-
-修改后先运行适用检查并提交本地 main，再更新 Chrona 的固定 bundle、artifact 输入与 lock。Git bundle 不含 chrona-material.json 声明的 artifact；主仓库同时固定其精确字节与 executable mode，恢复必须通过完整材料校验。不得仅改 checkout 而跳过输入更新。
-
-发行/暂停政策由 Chrona 声明；本仓库存在不表示自动运行或发行。Remind 仍暂停。
+本轮仅迁移/编辑源码并做文件、导入、JSON 与 diff 静态检查；没有构建、编译、测试、lint、typecheck、安装、模型/服务调用、提交或推送。`vendor/`、既有运行/浏览器制品、`bun.lock`、`chrona-material.json`、材料 hash/pin 未因本轮源码修改而重算，旧制品不能证明这些修改已生效。后续发行须在授权构建后生成真实制品、锁与材料记录。
