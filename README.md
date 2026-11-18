@@ -24,7 +24,7 @@ bun run test
 bun run build
 ```
 
-`build.ts` 将 `ui.ts` 及其依赖打包为浏览器产物 `dist/ui.js`；`ui.css` 直接用于组件注册。宿主从 `index.ts` 启动应用。`chrona-material.json` 列出源码、构建命令及产物摘要；修改或重建产物后应同步摘要和实际使用的工具链版本。
+`bun run build` 先检查严格 TypeScript，再用 Vite 构建 `dist/ui.js` 和 `dist/ui.css`。构建需要 Bun 和 Node.js（20.19+ 或 22.12+）。工作台、会话列表和消息视图由 React 渲染，复用 Author 模板的 shadcn 按钮和 Tailwind 样式作用域。`index.ts` 在激活时注册两个制品。`chrona-material.json` 列出源码、构建命令及产物摘要；修改或重建产物后应同步摘要和实际使用的工具链版本。
 
 主要文件：
 
@@ -34,7 +34,8 @@ bun run build
 | `state.ts` | 私有会话存储、操作快照与执行恢复 |
 | `client-state.ts` | 浏览器草稿及会话选择状态 |
 | `tool-selection.ts`、`delivery.ts` | 工具发现与选择、交付回执识别 |
-| `ui.ts`、`ui.css` | 工作台界面与样式 |
+| `workbench.tsx`、`conversation-view.tsx` | 工作台、会话列表和消息视图 |
+| `ui.ts`、`ui.css` | 会话交互、现有工具面板和页面样式 |
 | `test-support/` | Web 注册测试工具与浏览器预览样式夹具 |
 
 ## 验证

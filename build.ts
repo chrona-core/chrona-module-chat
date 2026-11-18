@@ -1,4 +1,2 @@
-import {mkdir} from 'node:fs/promises';
-await mkdir('dist',{recursive:true});
-const r=await Bun.build({entrypoints:['ui.ts'],outdir:'dist',naming:'ui.js',target:'browser',minify:false});
-if(!r.success)throw new AggregateError(r.logs,'build failed');
+const result = Bun.spawnSync(['node', 'node_modules/vite/bin/vite.js', 'build'], { stdout: 'inherit', stderr: 'inherit' });
+if (result.exitCode !== 0) process.exit(result.exitCode);

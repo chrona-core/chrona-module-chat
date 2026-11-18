@@ -100,7 +100,7 @@ on('tool',async event=>{
 on('activated',async()=>{
  // The approved integration observes future sent facts by default; any explicit scope choice wins.
  const learning=store.observations.scopeTool();if(learning.revision===0&&!learning.enabled)store.observations.scopeTool({expectedRevision:0,enabled:true});
- await chrona.call(dep('web','page-set'),{id:'main',title:'Chat',layout:'workspace',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'ui.css'),'utf8'),tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope','task-view','task-control']});
+ await chrona.call(dep('web','page-set'),{id:'main',title:'Chat',layout:'workspace',javascript:readFileSync(join(chrona.paths.module,'dist/ui.js'),'utf8'),css:readFileSync(join(chrona.paths.module,'dist/ui.css'),'utf8'),tools:['catalog','list','create','read','draft','edit','delete','upload','detach','image','execute','native','delivery','new-context','observation-scope','task-view','task-control']});
 });
 
 // Chat remains responsible for observing its own foreground Run after the browser closes.

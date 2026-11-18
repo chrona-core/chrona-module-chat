@@ -1,3 +1,6 @@
+import { createRoot, type Root } from "react-dom/client";
+import { Button } from "./button";
+
 type Api = (name: string, args?: Record<string, unknown>) => Promise<unknown>;
 type Task = {
   id: string; title: string; status: string; waitFor?: string; lastActivity: string;
@@ -56,22 +59,13 @@ function overview(box: HTMLElement, detail: Task) {
   heading.textContent = '技术记录'; pre.textContent = JSON.stringify({ id: detail.id, revision: detail.revision, ...detail.details }, null, 2);
   technical.append(heading, pre); technical.open = !!expanded; box.append(technical);
 }
-function layout(root: HTMLElement) {
-  const sidebar = document.createElement('section'); sidebar.className = 'chat-tasks'; sidebar.setAttribute('aria-label', '后台任务');
-  sidebar.innerHTML = '<div class="chat-task-heading"><b>后台任务</b><button type="button" class="chat-tasks-refresh">刷新</button></div><p class="chat-task-load" role="status">正在加载任务…</p><nav aria-label="后台任务列表"></nav>';
-  root.querySelector('.chat-sidebar')!.append(sidebar);
-  const panel = document.createElement('section'); panel.className = 'chat-task-panel'; panel.hidden = true; panel.setAttribute('aria-label', '任务进展');
-  panel.innerHTML = '<div class="chat-task-overview"></div><div class="chat-task-artifacts"></div><div class="chat-task-artifact" hidden></div><p class="chat-task-notice" role="status"></p><form class="chat-task-form"><label>补充任务要求<textarea aria-label="补充任务要求" rows="2" placeholder="补充验收标准、回答问题或说明下一步…"></textarea></label><div><button type="submit">发送补充</button><button type="button" class="chat-task-pause">暂停任务</button><button type="button" class="chat-task-resume">继续任务</button><button type="button" class="chat-task-retry" hidden>核对原请求</button><button type="button" class="chat-task-close">返回对话</button></div></form>';
-  root.querySelector('.chat-main')!.append(panel);
-  return { sidebar, panel };
-}
-
 /** Live task views are never copied to Chat messages or a second conversation store. */
 class TaskWorkbench {
   private readonly sidebar: HTMLElement;
   private readonly panel: HTMLElement;
   private readonly notice: HTMLElement;
-  private readonly nav: HTMLElement;
+  private readonly listView: Root;
+  private readonly artifactsView: Root;
   private readonly search: HTMLInputElement;
   private items: Task[] = [];
   selected: string | undefined;
@@ -83,9 +77,12 @@ class TaskWorkbench {
   private generation = 0;
   private controlling = false;
   constructor(private readonly root: HTMLElement, private readonly api: Api,
-    private readonly selectConversation: ConversationReader, private readonly onClose: () => void) {
-    const nodes = layout(root); this.sidebar = nodes.sidebar; this.panel = nodes.panel;
-    this.notice = find(this.sidebar, '.chat-task-load'); this.nav = find(this.sidebar, 'nav');
+    private readonly selectConversation: ConversationReader, private readonly onOpen: () => void, private readonly onClose: () => void) {
+    this.sidebar = find(root, '.chat-tasks');
+    this.panel = find(root, '.chat-task-panel');
+    this.notice = find(this.sidebar, '.chat-task-load');
+    this.listView = createRoot(find(this.sidebar, 'nav'));
+    this.artifactsView = createRoot(this.q('.chat-task-artifacts'));
     this.search = find(root, '.chat-search'); this.search.addEventListener('input', this.drawList);
     this.q<HTMLFormElement>('.chat-task-form').onsubmit = event => { event.preventDefault(); void this.control('supplement'); };
     this.q('.chat-task-pause').onclick = () => void this.control('pause');
@@ -104,15 +101,14 @@ class TaskWorkbench {
     return value;
   }
   private drawList = () => {
-    this.nav.replaceChildren();
     const search = this.search.value.toLocaleLowerCase();
-    for (const item of this.items.filter(task => task.title.toLocaleLowerCase().includes(search))) {
-      const button = document.createElement('button'); button.type = 'button'; button.dataset.taskId = item.id;
-      button.className = item.id === this.selected ? 'chat-selected' : ''; button.setAttribute('aria-current', item.id === this.selected ? 'page' : 'false');
-      const title = document.createElement('span'), status = document.createElement('small');
-      title.textContent = item.title; status.textContent = `${statusText(item)} · ${timeText(item.lastActivity)}`;
-      button.append(title, status); button.onclick = () => void this.select(item.id); this.nav.append(button);
-    }
+    this.listView.render(this.items.filter(task => task.title.toLocaleLowerCase().includes(search)).map(item => (
+      <Button key={item.id} variant="ghost" type="button" data-task-id={item.id}
+        className={item.id === this.selected ? 'chat-selected' : ''}
+        aria-current={item.id === this.selected ? 'page' : 'false'} onClick={() => void this.select(item.id)}>
+        <span>{item.title}</span><small>{statusText(item)} · {timeText(item.lastActivity)}</small>
+      </Button>
+    )));
   };
   private lock() {
     const waiting = !!this.pending(), disabled = this.controlling || waiting || !this.current;
@@ -138,13 +134,11 @@ class TaskWorkbench {
     this.lock(); this.drawList();
   }
   private artifacts(detail: Task) {
-    const box = this.q('.chat-task-artifacts'); box.replaceChildren();
-    if (!detail.artifacts?.length) return;
-    const heading = document.createElement('h3'); heading.textContent = '任务产物'; box.append(heading);
-    for (const artifact of detail.artifacts) {
-      const button = document.createElement('button'); button.type = 'button'; button.textContent = readable(artifact.title);
-      button.onclick = () => void this.showArtifact(detail.id, artifact.ref); box.append(button);
-    }
+    this.artifactsView.render(detail.artifacts?.length ? <>
+      <h3>任务产物</h3>
+      {detail.artifacts.map(artifact => <Button key={artifact.ref} variant="outline" type="button"
+        onClick={() => void this.showArtifact(detail.id, artifact.ref)}>{readable(artifact.title)}</Button>)}
+    </> : null);
   }
   private async showArtifact(id: string, ref: string) {
     try {
@@ -172,7 +166,7 @@ class TaskWorkbench {
   async select(id: string) {
     const token = ++this.generation; this.selected = id; this.current = undefined; this.linkedConversation = undefined;
     this.signature = ''; this.panel.hidden = false; this.root.classList.add('chat-task-selected', 'chat-task-only');
-    this.q('.chat-task-overview').replaceChildren(); this.q('.chat-task-artifacts').replaceChildren();
+    this.q('.chat-task-overview').replaceChildren(); this.artifactsView.render(null);
     this.q('.chat-task-notice').textContent = '正在读取任务…'; this.q('.chat-task-artifact').hidden = true;
     this.q<HTMLTextAreaElement>('textarea').value = ''; this.lock();
     try {
@@ -180,7 +174,7 @@ class TaskWorkbench {
       if (!this.active(id, token)) return;
       const url = new URL(window.location.href); url.searchParams.set('task', id);
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-      this.root.classList.remove('chat-drawer-open'); this.render(detail);
+      this.onOpen(); this.render(detail);
       this.q('.chat-task-notice').textContent = this.pending() ? '上次操作结果待核对，请核对原请求。' : '';
       await this.linkConversation(detail, token);
     } catch (error) {
@@ -201,7 +195,7 @@ class TaskWorkbench {
       }
     } catch (error) {
       log('task_load_failed', error);
-      if (this.alive()) { this.notice.textContent = '后台任务暂时无法加载：' + message(error); this.nav.replaceChildren(); }
+      if (this.alive()) { this.notice.textContent = '后台任务暂时无法加载：' + message(error); this.listView.render(null); }
     } finally {
       this.loading = false;
       if (this.alive()) find<HTMLButtonElement>(this.sidebar, '.chat-tasks-refresh').disabled = false;
@@ -244,9 +238,10 @@ class TaskWorkbench {
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash); this.onClose();
   }
   destroy() {
-    this.dead = true; this.search.removeEventListener('input', this.drawList); this.sidebar.remove(); this.panel.remove();
+    this.dead = true; this.search.removeEventListener('input', this.drawList);
+    queueMicrotask(() => { this.listView.unmount(); this.artifactsView.unmount(); });
   }
 }
-export function mountTasks(root: HTMLElement, api: Api, selectConversation: ConversationReader, onClose: () => void) {
-  return new TaskWorkbench(root, api, selectConversation, onClose);
+export function mountTasks(root: HTMLElement, api: Api, selectConversation: ConversationReader, onOpen: () => void, onClose: () => void) {
+  return new TaskWorkbench(root, api, selectConversation, onOpen, onClose);
 }

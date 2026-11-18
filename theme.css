@@ -1,0 +1,34 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" source(none);
+@import "tw-animate-css";
+@source "./workbench.tsx";
+@source "./tasks-ui.tsx";
+@source "./conversation-view.tsx";
+@source "./button.tsx";
+@source "./input.tsx";
+@source "./textarea.tsx";
+@source "./native-select.tsx";
+@source "./dropdown-menu.tsx";
+@source "./dialog.tsx";
+@source "./conversation-menu.tsx";
+@custom-variant dark (@media (prefers-color-scheme: dark));
+@theme inline {
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--fg);
+  --color-card: var(--card);
+  --color-card-foreground: var(--fg);
+  --color-muted: var(--rail);
+  --color-background: var(--card);
+  --color-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-accent: var(--selection);
+  --color-accent-foreground: var(--fg);
+  --color-secondary: var(--rail);
+  --color-secondary-foreground: var(--fg);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+  --color-destructive: var(--accent);
+}

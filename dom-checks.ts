@@ -10,9 +10,9 @@ const wait = async (fn: () => boolean) => { for (let i=0;i<200;i++) { if(fn())re
 export async function runDomChecks() {
   const window = new Window({ url:'http://localhost/chat-test' });
   const previous = new Map<string, PropertyDescriptor | undefined>();
-  for (const key of ['window','document','HTMLElement','Element','Node','navigator','localStorage','innerHeight']) {
+  for (const key of ['window','document','HTMLElement','Element','Node','navigator','localStorage','innerHeight','MutationObserver','NodeFilter','CustomEvent','getComputedStyle']) {
     previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));
-    Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:key==='window'?window:key==='innerHeight'?900:Reflect.get(window,key)});
+    Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:key==='window'?window:key==='innerHeight'?900:key==='getComputedStyle'?window.getComputedStyle.bind(window):Reflect.get(window,key)});
   }
   const directory=mkdtempSync(join(tmpdir(),'chat-dom-'));let destroy:(()=>void)|undefined;
   let stopped=false,holdStop=false,releaseStop:(()=>void)|undefined,loseMessage=true;
@@ -47,8 +47,17 @@ export async function runDomChecks() {
     const container=window.document.createElement('div');window.document.body.append(container);
     destroy=mount(container as unknown as HTMLElement,{call});
     const q=<T extends HTMLElement=HTMLButtonElement>(s:string)=>container.querySelector(s) as unknown as T;
+    const refresh = async () => {
+      if (!q('[data-action=refresh]')) {
+        await wait(() => !!q('.chat-more button'));
+        q('.chat-more button').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }) as unknown as Event);
+        await wait(() => !!q('[data-action=diagnostics]'));
+        q('[data-action=diagnostics]').click();
+      }
+      q('[data-action=refresh]').click();
+    };
     assert.equal(q('[data-action=settings]').disabled,true);
-    q('[data-action=settings]').click();assert.equal(q<HTMLDialogElement>('.chat-settings').open,false);
+    q('[data-action=settings]').click();assert.equal(q('.chat-settings'),null);
     await wait(()=>q('h1').textContent==='先显示已有会话');
     assert.equal(q('textarea').disabled,true);releaseCatalog();
     await wait(()=>!q('textarea').disabled);
@@ -57,7 +66,7 @@ export async function runDomChecks() {
     type('hello');q('.chat-send').click();await wait(()=>keys.length===1&&!q('.chat-stop').hidden&&!q('.chat-stop').disabled);
     type('supplement');q('.chat-send').click();await wait(()=>keys.some(x=>x.kind==='message'));
     await wait(()=>q('.chat-alert').textContent.includes('lost'));
-    q('[data-action=refresh]').click();await wait(()=>keys.filter(x=>x.kind==='message').length===2);
+    await refresh();await wait(()=>keys.filter(x=>x.kind==='message').length===2);
     const sends=keys.filter(x=>x.kind==='message');assert.equal(sends[0].key,sends[1].key);assert.equal(sends[0].input,sends[1].input);
     holdStop=true;await wait(()=>!q('.chat-stop').disabled);q('.chat-stop').click();await wait(()=>!!releaseStop);
     type('new draft while stop reply is delayed');releaseStop!();await wait(()=>q('.chat-stop').hidden);
@@ -65,10 +74,10 @@ export async function runDomChecks() {
     assert.equal(JSON.parse(window.localStorage.getItem('chat.draft.'+store.list()[0].id)!).text,'new draft while stop reply is delayed');
     const commandCount=keys.length;
     mindUpdates=[{id:'goal',status:'waiting',goal:'交付应用中心',waitReason:'缺少实际材料接口',nextStep:'任务负责人补齐后继续'}];
-    q('[data-action=refresh]').click();await wait(()=>q('.chat-mind-updates').textContent.includes('缺少实际材料接口'));
+    await refresh();await wait(()=>q('.chat-mind-updates').textContent.includes('缺少实际材料接口'));
     assert.equal(q('.chat-mind-updates').getAttribute('role'),'status');assert.equal(keys.length,commandCount);
     assert.equal(q('.chat-messages').textContent.includes('缺少实际材料接口'),false);
-    mindUpdates=[];q('[data-action=refresh]').click();await wait(()=>q('.chat-mind-updates').hidden);
+    mindUpdates=[];await refresh();await wait(()=>q('.chat-mind-updates').hidden);
     const d=new Drafts(window.localStorage),ops=new Operations(window.localStorage);
     const idle=store.list()[0].id,unreceived=ops.begin(idle,'send',{},null),beforePoll=observedReads;
     await new Promise(r=>setTimeout(r,2200));
@@ -83,7 +92,7 @@ export async function runDomChecks() {
     const receipt={receiptId:'receipt',requestKey:'key',members:[{moduleId:'m',hash:'a'.repeat(40)}]};
     const found=submittedReceipts({messages:[{run:{transcript:[{kind:'result',tool:'m_author_submit',text:JSON.stringify({result:receipt}),error:false}]}}],deliveries:[]});assert.equal(found.length,1);
     const empty=store.create('pi');const blank=ops.begin(empty.id,'send',{},null);const rejected=await store.operate(empty.id,blank.key,'send',{});ops.settle(empty.id,rejected,d);assert.equal(ops.read(empty.id),null);
-    return {checks:11,details:['initialization disabled','default Provider ready','real UI+Store synchronous send','same-key supplemental HTTP loss','late stop does not erase draft or recovery copy','acknowledged token only','upload origin fixed','actual m_author_submit receipt','native dialog controls']};
+    return {checks:11,details:['initialization disabled','default Provider ready','real UI+Store synchronous send','same-key supplemental HTTP loss','late stop does not erase draft or recovery copy','acknowledged token only','upload origin fixed','actual m_author_submit receipt','dialog controls']};
   }finally{
     destroy?.();store.close();rmSync(directory,{recursive:true,force:true});await window.happyDOM.close();
     for(const [key,descriptor] of previous)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);

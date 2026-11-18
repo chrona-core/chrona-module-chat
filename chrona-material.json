@@ -3,25 +3,34 @@
   "source": [
     ".gitignore",
     "browser-check.js",
+    "browser-entry.ts",
     "browser-fixture.ts",
     "build.ts",
     "bun.lock",
+    "button.tsx",
     "client-state.ts",
+    "cn.ts",
     "context-admission.bun.test.ts",
+    "conversation-menu.tsx",
+    "conversation-view.tsx",
     "create-checks.ts",
     "create.bun.test.ts",
     "delivery.ts",
     "DEVELOPMENT.md",
+    "dialog.tsx",
     "dom-checks.ts",
     "dom.test.ts",
+    "dropdown-menu.tsx",
     "frontend-context.ts",
     "host-agent.integration.test.ts",
     "index.ts",
+    "input.tsx",
     "LICENSE",
     "mind-tasks.ts",
     "mind-updates.bun.test.ts",
     "mind-updates.ts",
     "module.json",
+    "native-select.tsx",
     "observations.bun.test.ts",
     "observations.ts",
     "package.json",
@@ -33,25 +42,35 @@
     "registration-checks.ts",
     "selection-checks.ts",
     "selection.bun.test.ts",
+    "SHADCN-LICENSE.md",
     "state-checks.ts",
     "state.test.ts",
     "state.ts",
-    "tasks-ui.ts",
+    "tasks-ui.tsx",
     "tasks.bun.test.ts",
     "test-support/host-style.css",
     "test-support/registration-test.mjs",
     "test.ts",
+    "textarea.tsx",
+    "theme.css",
     "tool-selection.ts",
+    "tsconfig.json",
     "ui-mind.bun.test.ts",
     "ui.css",
     "ui.ts",
     "view-types.ts",
-    "web-registration.bun.test.ts"
+    "vite.config.ts",
+    "web-registration.bun.test.ts",
+    "workbench.tsx"
   ],
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "8c54bb4340f9d63d9f0d40934e6bb21ea21dafc1f09cfe1d3ebdced1dd7dc6fc"
+      "sha256": "c8b76d672b2dbfc8e728b36cfe157872eafbb909dabacf766aa784c716bc0b18"
+    },
+    {
+      "path": "dist/ui.css",
+      "sha256": "e68ab9125853114d90de165d40313b3d685fbdd3e995eb67c5e79df4d18afb31"
     }
   ],
   "build": {
@@ -59,7 +78,7 @@
       "bun install --frozen-lockfile --ignore-scripts --backend=copyfile",
       "bun run build"
     ],
-    "toolchain": "bun 1.4.2 (744846f84)",
+    "toolchain": "Bun 1.4.2; Node.js 22.22.3; TypeScript 5.9.3; Vite 8.3.8",
     "target": "browser JavaScript; Chrona TypeScript host"
   }
 }

@@ -32,8 +32,8 @@ export async function runSelectionChecks() {
   const legacy=store.create('pi');assert.deepEqual(store.get(legacy.id).settings.tools,[]);
   const window=new Window({url:'http://localhost/p/chat/main?new=1&keep=yes#anchor'});
   const prev=new Map<string,PropertyDescriptor|undefined>();let destroy:any;
-  for(const key of ['window','document','HTMLElement','Element','Node','navigator','localStorage','innerHeight']){
-   prev.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:key==='window'?window:key==='innerHeight'?900:(window as any)[key]});
+  for(const key of ['window','document','HTMLElement','Element','Node','navigator','localStorage','innerHeight','MutationObserver','NodeFilter','CustomEvent','getComputedStyle']){
+   prev.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:key==='window'?window:key==='innerHeight'?900:key==='getComputedStyle'?window.getComputedStyle.bind(window):(window as any)[key]});
   }
   let creates=0,records:any[]=[];
   const catalog={providers:[],configs:{},tools:found.slice(0,70)};
@@ -65,8 +65,8 @@ export async function runSelectionChecks() {
    destroy();destroy=mount(el as any,{call:api});await wait(()=>q('h1').textContent==='新会话');
    const bButton=[...el.querySelectorAll('nav button')].find((x:any)=>x.textContent==='B') as any;bButton.click();await wait(()=>q('h1').textContent==='B');assert.equal(new URL(window.location.href).searchParams.get('conversation'),b.id);
    destroy();destroy=mount(el as any,{call:api});await wait(()=>q('h1').textContent==='B');assert.equal(new URL(window.location.href).searchParams.get('conversation'),b.id);assert.equal(new URL(window.location.href).searchParams.get('keep'),'yes');assert.equal(window.location.hash,'#anchor');
-   q('[data-action=delete]').click();q('.chat-confirm').close('delete');await wait(()=>q('h1').textContent==='新会话');assert.equal(new URL(window.location.href).searchParams.get('conversation'),aId);assert.equal(records.some(x=>x.id===b.id),false);
-   destroy();records=[];window.history.replaceState(null,'','/p/chat/main');destroy=mount(el as any,{call:api});await wait(()=>q('.chat-badge').textContent==='选择或新建对话');assert.equal(creates,1);
+   await wait(()=>!!q('.chat-more button'));q('.chat-more button').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await wait(()=>!!q('[data-action=delete]'));q('[data-action=delete]').click();q('.chat-confirm button[value=delete]').click();await wait(()=>q('h1').textContent==='新会话');assert.equal(new URL(window.location.href).searchParams.get('conversation'),aId);assert.equal(records.some(x=>x.id===b.id),false);
+   destroy();records=[];window.history.replaceState(null,'','/p/chat/main');destroy=mount(el as any,{call:api});await wait(()=>q('.chat-badge').textContent==='新对话');assert.equal(q('.chat-compose textarea').disabled,false);assert.equal(creates,1);
   }finally{destroy?.();await window.happyDOM.close();for(const[k,d]of prev)if(d)Object.defineProperty(globalThis,k,d);else delete(globalThis as any)[k];}
   return {checks:9};
  }finally{store.close();rmSync(dir,{recursive:true,force:true});}

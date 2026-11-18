@@ -56,9 +56,9 @@ test('Mind lookup returns on the 300ms deadline even when the tool never settles
 test('owner scope UI shows status, saves CAS switches and requires review after a conflict', async () => {
   const window = new Window({ url: 'http://localhost/chat-mind-test' });
   const previous = new Map<string, PropertyDescriptor | undefined>();
-  for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'navigator', 'localStorage', 'innerHeight']) {
+  for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'navigator', 'localStorage', 'innerHeight', 'MutationObserver', 'NodeFilter', 'CustomEvent', 'getComputedStyle']) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
-    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === 'window' ? window : key === 'innerHeight' ? 900 : (window as any)[key] });
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === 'window' ? window : key === 'innerHeight' ? 900 : key === 'getComputedStyle' ? window.getComputedStyle.bind(window) : (window as any)[key] });
   }
   const original = console.error, logs: string[] = [];
   console.error = (line: string) => { logs.push(line); };
@@ -90,11 +90,17 @@ test('owner scope UI shows status, saves CAS switches and requires review after 
     const container = window.document.createElement('div'); window.document.body.append(container);
     destroy = mount(container as any, { call });
     const q = (selector: string) => container.querySelector(selector) as any;
+    const openScope = async () => {
+      await wait(() => q('.chat-more button')?.disabled === false);
+      q('.chat-more button').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      await wait(() => !!q('[data-action="mind-scope"]'));
+      q('[data-action="mind-scope"]').click();
+    };
     await wait(() => !q('textarea').disabled);
     expect(q('.chat-mind-context').hidden).toBe(false);
     expect(q('.chat-mind-context').textContent).toContain('超时');
-    q('[data-action="mind-scope"]').click(); await wait(() => !!release);
-    expect(q('.chat-mind-scope').open).toBe(true);
+    await openScope(); await wait(() => !!release);
+    expect(q('.chat-mind-scope').getAttribute('role')).toBe('dialog');
     expect(q('.chat-scope-status').textContent).toContain('正在读取');
     expect(q('.chat-scope-form button').disabled).toBe(true);
     expect(q('.chat-mind-scope').textContent).toContain('不会读取草稿');
@@ -118,9 +124,8 @@ test('owner scope UI shows status, saves CAS switches and requires review after 
 
     destroy(); window.localStorage.clear();
     destroy = mount(container as any, { call: (name: string, input: any) => name === 'list' ? Promise.resolve({ json: '{"items":[]}' }) : call(name, input) });
-    await wait(() => !q('[data-action="mind-scope"]').disabled);
     expect(q('.chat-mind-context').hidden).toBe(true);
-    q('[data-action="mind-scope"]').click(); await wait(() => !q('.chat-scope-form button').disabled);
+    await openScope(); await wait(() => !q('.chat-scope-form button').disabled);
     expect(scopeCalls.at(-1)).toEqual({});
     expect(q('.chat-scope-conversation').disabled).toBe(true);
     q('[name="enabled"]').checked = true; submit();

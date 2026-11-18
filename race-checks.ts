@@ -7,9 +7,9 @@ function deferred() { let resolve!:()=>void; const promise=new Promise<void>(r=>
 export async function runRaceChecks() {
   const window=new Window({url:'http://localhost/race-test'});
   const previous=new Map<string,PropertyDescriptor|undefined>();
-  for(const key of ['window','document','HTMLElement','Element','Node','navigator','localStorage','innerHeight']) {
+  for(const key of ['window','document','HTMLElement','Element','Node','navigator','localStorage','innerHeight','MutationObserver','NodeFilter','CustomEvent','getComputedStyle']) {
     previous.set(key,Object.getOwnPropertyDescriptor(globalThis,key));
-    Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:key==='window'?window:key==='innerHeight'?900:(window as any)[key]});
+    Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:key==='window'?window:key==='innerHeight'?900:key==='getComputedStyle'?window.getComputedStyle.bind(window):(window as any)[key]});
   }
   // Match the real browser lifecycle: initialize DOMPurify only after the DOM exists.
   const { default: mount } = await import('./ui');
@@ -41,7 +41,18 @@ export async function runRaceChecks() {
   const select=(id:string)=>{const button=[...container.querySelectorAll('nav button')].find((b:any)=>b.textContent===id) as any;assert.ok(button);button.click();};
   const type=(value:string)=>{q('textarea').value=value;q('textarea').dispatchEvent(new window.Event('input',{bubbles:true}));};
   const setting=(value:string)=>{q('.chat-thinking').value=value;q('.chat-thinking').dispatchEvent(new window.Event('change',{bubbles:true}));};
-  const refresh=()=>q('[data-action=refresh]').click();
+  const openMenu = async () => {
+    await wait(() => !!q('.chat-more button'));
+    q('.chat-more button').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  };
+  const refresh = async () => {
+    if (!q('[data-action=refresh]')) {
+      await openMenu();
+      await wait(() => !!q('[data-action=diagnostics]'));
+      q('[data-action=diagnostics]').click();
+    }
+    q('[data-action=refresh]').click();
+  };
   const setup=async()=>{
     destroy?.();container?.remove();window.localStorage.clear();window.history.replaceState(null,'','/race-test?keep=yes#anchor');
     for(const id of ['A','B','C'])records.set(id,make(id));
@@ -55,7 +66,7 @@ export async function runRaceChecks() {
     const oldRead=deferred();heldRead={id:'A',gate:oldRead};select('A');await wait(()=>readStarted.length===2);
     setting('high');await wait(()=>records.get('A')!.revision===6);
     oldRead.resolve();await new Promise(r=>setTimeout(r,0));
-    type('new draft');refresh();await wait(()=>writes.length===2&&records.get('A')!.revision===7);
+    type('new draft');await refresh();await wait(()=>writes.length===2&&records.get('A')!.revision===7);
     assert.deepEqual(writes.map(x=>x.revision),[5,6]);assert.equal(q('.chat-thinking').value,'high');
     results.push('delayed same-ID read cannot roll revision back');
 
@@ -72,7 +83,7 @@ export async function runRaceChecks() {
       const token=window.localStorage.getItem('chat.draft.A');
       setting('high');await wait(()=>q('.chat-alert').textContent.includes('revision conflict'));
       const attempts=writes.length,reads=readStarted.length;
-      refresh();await wait(()=>readStarted.length===reads+1&&q('.chat-model').value==='other');
+      await refresh();await wait(()=>readStarted.length===reads+1&&q('.chat-model').value==='other');
       assert.equal(writes.length,attempts);assert.equal(window.localStorage.getItem('chat.draft.A'),token);
       if(withLocal)assert.equal(q('textarea').value,'unsaved local text');
       assert.equal(q('.chat-send').disabled,true);
@@ -86,12 +97,12 @@ export async function runRaceChecks() {
       // Block both ordinary click and a synthetic action dispatched on the disabled button.
       q('.chat-send').dispatchEvent(new window.MouseEvent('click',{bubbles:true}));
       await new Promise(r=>setTimeout(r,0));assert.equal(executions.length,0);
-      q('[data-action=review-draft]').click();await wait(()=>!!q('.chat-draft-review'));
+      await openMenu();await wait(()=>!!q('[data-action=review-draft]'));q('[data-action=review-draft]').click();await wait(()=>!!q('.chat-draft-review'));
       const review=q('.chat-draft-review pre').textContent;
       assert.ok(review.includes('other'));assert.ok(review.includes('high'));
       assert.equal(writes.length,attempts); // A recovery read never replays stale settings.
       if(withLocal) {assert.ok(review.includes('unsaved local text'));type('newer text during review');}
-      const dialog=q('.chat-draft-review');dialog.close('retry');
+      q('.chat-draft-review button[value=retry]').click();
       await wait(()=>records.get('A')!.revision===7);
       assert.equal(records.get('A')!.settings.thinking,'high');
       assert.equal(window.localStorage.getItem('chat.conflict.A'),null);
@@ -105,7 +116,7 @@ export async function runRaceChecks() {
     await wait(()=>records.get('A')!.revision===7);assert.deepEqual(writes.map(x=>x.revision),[5,6]);
     results.push('serial settings saves increment 5→6→7');
 
-    await setup();const draftSave=deferred();heldSave=draftSave;type('serial draft');refresh();await wait(()=>writes.length===1);refresh();draftSave.resolve();
+    await setup();const draftSave=deferred();heldSave=draftSave;type('serial draft');await refresh();await wait(()=>writes.length===1);await refresh();draftSave.resolve();
     await wait(()=>records.get('A')!.revision===7);assert.deepEqual(writes.map(x=>x.revision),[5,6]);
     results.push('serial draft saves increment 5→6→7');
     return {checks:results.length,details:results};
