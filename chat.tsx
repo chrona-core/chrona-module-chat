@@ -1,20 +1,22 @@
-import { Popover, PopoverTrigger, PopoverContent } from './elements/popover';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowUp, Brain, Check, ChevronDown, Ellipsis, Menu, Paperclip, Plus, Search, Settings2, Square, X } from 'lucide-react';
+import { ArrowUp, Brain, ChevronDown, Ellipsis, Menu, Paperclip, Plus, Search, Settings2, Square, X } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './elements/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './elements/alert-dialog';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from './elements/sheet';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from './elements/sidebar-menu';
 import { Empty, EmptyTitle } from './elements/empty';
 import { Alert, AlertDescription } from './elements/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './elements/collapsible';
-import { NativeSelect, NativeSelectOption } from './elements/native-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './elements/tabs';
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentGroup, AttachmentTitle } from './elements/attachment';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from './elements/input-group';
-import { Command as ModelCommand, CommandEmpty, CommandInput, CommandItem, CommandList } from './elements/command';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from './elements/dropdown-menu';
+import { ModelSelector, ModelSelectorContent, ModelSelectorEmpty, ModelSelectorGroup, ModelSelectorInput, ModelSelectorItem, ModelSelectorList, ModelSelectorName, ModelSelectorTrigger } from './elements/model-selector';
+import { Card, CardContent, CardHeader, CardTitle } from './elements/card';
+import { Field, FieldGroup, FieldLabel } from './elements/field';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem } from './elements/dropdown-menu';
 import { Thread } from './thread';
 import { Tools, Delivery, Scope, type Api } from './panels';
 import type { Catalog, Conversation, ConversationSummary } from './view-types';
@@ -38,12 +40,17 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
   const [query, setQuery] = useState('');
   const [archived, setArchived] = useState(false);
   const [find, setFind] = useState<string | null>(null);
-  const [panel, setPanel] = useState<'tools' | 'manage' | 'delivery' | 'scope' | 'image' | 'run' | null>(null);
+  const [panel, setPanel] = useState<'tools' | 'manage' | 'rename' | 'confirm' | 'delivery' | 'scope' | 'image' | 'run' | null>(null);
+  const [confirmation, setConfirmation] = useState<'delete' | 'new-context' | null>(null);
+  const confirmationTrigger = useRef<HTMLButtonElement>(null);
+  const cancelConfirmation = useRef<HTMLButtonElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
-  const [modelProvider, setModelProvider] = useState('');
+  const modelSearch = useRef<HTMLInputElement>(null);
+  const modelTrigger = useRef<HTMLButtonElement>(null);
   const [image, setImage] = useState<{name: string; src: string}>();
   const [drafts, setDrafts] = useState<Record<string, string | undefined>>({});
   const [retry, setRetry] = useState<Command>();
@@ -79,6 +86,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
     setFind(null);
     setDrawer(false);
     setPanel(null);
+    setConfirmation(null);
     setModelOpen(false);
   }
 
@@ -242,9 +250,6 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
   const provider = available.find(p => p.id === conversation?.settings.providerId);
   const contextProvider = conversation?.context?.providerId;
   const pickerProviders = contextProvider ? available.filter(p => p.id === contextProvider) : available;
-  const pickerProvider = pickerProviders.find(p => p.id === modelProvider) ?? pickerProviders.find(p => p.id === provider?.id) ?? pickerProviders[0];
-  const config = pickerProvider && catalog?.configs[pickerProvider.id];
-  const models = [{value:'', label:'继承提供方设置'}, ...(config?.models ?? []).filter(model => model.value)];
   const effortLevels = provider ? catalog?.configs[provider.id]?.thinking ?? [] : [];
   const effort = conversation?.settings.thinking ?? '';
   const effortLabels: Record<string, string> = {off:'关闭', minimal:'最低', low:'低', medium:'中', high:'高', xhigh:'很高', max:'最高'};
@@ -258,20 +263,87 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
       close?.();
     });
   }
-  const title = {tools: '应用工具', manage: '管理对话', run: '执行记录', delivery: '应用交付', scope: 'Mind 学习范围', image: image?.name ?? '附件'};
+  const canChangeContext = !busy && !active && !pending;
+  function confirmConversationChange() {
+    if (!confirmation || !canChangeContext || (confirmation === 'delete' && currentRequest)) return;
+    const action = confirmation;
+    setConfirmation(null);
+    void task(async () => {
+      if (action === 'delete') {
+        await api('delete', {id, confirmed: true});
+        sessionStorage.removeItem(draftKey(id));
+        select('');
+        await refreshList();
+      } else {
+        update(await api('new-context', {id, confirmed: true}));
+      }
+      setPanel(null);
+    });
+  }
+
+  function openConversationPanel(row: ConversationSummary, nextPanel: 'manage' | 'rename' | 'run' | 'scope' | 'delivery', action?: 'delete' | 'new-context') {
+    if (selection.current !== row.id) select(row.id);
+    setDrawer(false);
+    setPanel(action ? 'confirm' : nextPanel);
+    if (action) {
+      confirmationTrigger.current = null;
+      setConfirmation(action);
+    }
+  }
+
+  function toggleConversation(row: ConversationSummary, field: 'pinned' | 'archived') {
+    return task(async () => update(await api('edit', {id: row.id, patch: JSON.stringify({[field]: !row[field]})})));
+  }
+
+  const title = {tools: '应用工具', manage: '管理对话', rename: '重命名对话', run: '执行记录', delivery: '应用交付', scope: 'Mind 学习范围', image: image?.name ?? '附件'};
+  const confirmationDialog = conversation && (<AlertDialog open={confirmation !== null} onOpenChange={open => {if (!open) {setConfirmation(null); if (panel === 'confirm') setPanel(null);}}}>
+          <AlertDialogContent container={container} initialFocus={cancelConfirmation} finalFocus={confirmationTrigger}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmation === 'delete' ? '删除对话？' : '重置执行上下文？'}</AlertDialogTitle>
+              <AlertDialogDescription>{confirmation === 'delete' ? `将删除「${conversation.title}」及其附件。此操作无法撤销。` : '后续执行将使用新的上下文，现有对话消息会保留。'}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel ref={cancelConfirmation}>取消</AlertDialogCancel>
+              <AlertDialogAction variant={confirmation === 'delete' ? 'destructive' : 'default'} disabled={!canChangeContext || (confirmation === 'delete' && !!currentRequest)} onClick={confirmConversationChange}>
+                {confirmation === 'delete' ? '删除对话' : '重置执行上下文'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>);
   const conversationList = <>
       <Button className="chat-new" disabled={busy} onClick={() => {select(''); requestAnimationFrame(() => composerInput.current?.focus());}}><Plus />新对话</Button>
-      <div className="chat-sidebar-filter">
-        <Input aria-label="搜索对话" placeholder="搜索对话" value={query} onChange={e => setQuery(e.target.value)} />
-        <NativeSelect aria-label="筛选对话" value={archived ? 'archived' : 'current'} onChange={e => setArchived(e.target.value === 'archived')}>
-          <NativeSelectOption value="current">当前</NativeSelectOption>
-          <NativeSelectOption value="archived">已归档</NativeSelectOption>
-        </NativeSelect>
-      </div>
-      <nav aria-label="会话列表">
-        <SidebarMenu>{visible.map(c => <SidebarMenuItem key={c.id}><SidebarMenuButton type="button" title={c.title} isActive={id === c.id} aria-current={id === c.id ? 'page' : undefined} onClick={() => select(c.id)}>{c.pinned && <span aria-label="已置顶">↟</span>}<span>{c.title}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
-        {ready && !visible.length && <Empty className="chat-list-empty"><EmptyTitle>{query ? '没有匹配的对话' : archived ? '没有归档对话' : '还没有对话'}</EmptyTitle></Empty>}
-      </nav>
+      <Input aria-label="搜索对话" placeholder="搜索对话" value={query} onChange={e => setQuery(e.target.value)} />
+      <Tabs className="min-h-0 flex-1" value={archived ? 'archived' : 'current'} onValueChange={value => setArchived(value === 'archived')}>
+        <TabsList aria-label="筛选对话" className="min-h-10 w-full shrink-0" activateOnFocus>
+          <TabsTrigger value="current" className="data-active:font-semibold">未归档</TabsTrigger>
+          <TabsTrigger value="archived" className="data-active:font-semibold">已归档</TabsTrigger>
+        </TabsList>
+        {(['current', 'archived'] as const).map(value => <TabsContent key={value} value={value} className="min-h-0 overflow-y-auto">
+          {(value === 'archived') === archived && (
+            <nav aria-label="会话列表">
+              <SidebarMenu>{visible.map(row => <SidebarMenuItem key={row.id} className="flex items-center gap-1">
+                <SidebarMenuButton type="button" className="chat-conversation-title min-w-0 flex-1" title={row.title} isActive={id === row.id} aria-current={id === row.id ? 'page' : undefined} onClick={() => select(row.id)}>
+                  {row.pinned && <span aria-label="已置顶">↟</span>}<span className="truncate">{row.title}</span>
+                </SidebarMenuButton>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild><Button type="button" size="icon-sm" variant="ghost" aria-label={`操作：${row.title}`}><Ellipsis /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent container={drawer ? drawerContainer ?? container : container} align="end" aria-label={`${row.title}的操作`}>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'rename')}>重命名</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'pinned')}>{row.pinned ? '取消置顶' : '置顶'}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'archived')}>{row.archived ? '取消归档' : '归档'}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'run')}>执行记录</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'delivery')}>应用交付</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'scope')}>Mind 学习范围</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onSelect={() => openConversationPanel(row, 'manage', 'new-context')}>重置执行上下文</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} variant="destructive" onSelect={() => openConversationPanel(row, 'manage', 'delete')}>删除对话</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>)}</SidebarMenu>
+              {ready && !visible.length && <Empty className="chat-list-empty"><EmptyTitle>{query ? '没有匹配的对话' : archived ? '没有归档对话' : '还没有对话'}</EmptyTitle></Empty>}
+            </nav>
+          )}
+        </TabsContent>)}
+      </Tabs>
   </>;
   return <div className="chat-layout">
     <aside className="chat-sidebar" aria-label="聊天导航"><strong className="chat-sidebar-heading">对话</strong>{conversationList}</aside>
@@ -279,7 +351,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
       <header className="chat-header">
         <Sheet open={drawer} onOpenChange={setDrawer} modal="trap-focus">
           <SheetTrigger render={<Button variant="ghost" size="icon-sm" aria-label="打开会话列表" className="chat-mobile" />}><Menu /></SheetTrigger>
-          <SheetContent container={container} side="left" className="chat-sidebar chat-sidebar-sheet"><SheetTitle>对话</SheetTitle>{conversationList}</SheetContent>
+          <SheetContent ref={setDrawerContainer} container={container} side="left" className="chat-sidebar chat-sidebar-sheet"><SheetTitle>对话</SheetTitle>{conversationList}</SheetContent>
         </Sheet>
         <h1>{conversation?.title ?? items.find(c => c.id === id)?.title ?? '对话'}</h1>
         {!!id && <Button className="chat-mobile" size="icon-sm" aria-label="新对话" disabled={busy} onClick={() => select('')}><Plus /></Button>}
@@ -293,51 +365,51 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
       })} /> : id && <div className="chat-welcome" role="status">{readError ? '无法打开对话' : '正在读取对话…'}</div>}
       {(conversation || !id) && <form className={`chat-composer${id ? '' : ' chat-composer-start'}`} onDragOver={e => {if (e.dataTransfer.types.includes('Files')) e.preventDefault();}} onDrop={e => {if (e.dataTransfer.files.length) {e.preventDefault(); upload(e.dataTransfer.files);}}} onSubmit={e => {e.preventDefault(); send();}}>
         {!id && <h2>想做些什么？</h2>}
-        <InputGroup className="chat-prompt">
+        <InputGroup className="chat-prompt overflow-hidden bg-background dark:bg-background">
           {!!conversation?.attachments.length && <InputGroupAddon align="block-start">
-            <AttachmentGroup>{conversation.attachments.map(file => <Attachment key={file.id}>
+            <AttachmentGroup>{conversation.attachments.map(file => <Attachment key={file.id} size="sm">
               <Paperclip size={14} /><AttachmentTitle>{file.name}</AttachmentTitle>
               <AttachmentActions><AttachmentAction type="button" aria-label={`移除 ${file.name}`} disabled={busy || !!pending || !!currentRequest} onClick={() => void task(async () => update(await api('detach', {id, attachmentId: file.id})))}><X /></AttachmentAction></AttachmentActions>
             </Attachment>)}</AttachmentGroup>
           </InputGroupAddon>}
           <label className="sr-only" htmlFor="chat-message">消息</label>
-          <InputGroupTextarea ref={composerInput} id="chat-message" value={text} onChange={e => writeDraft(e.target.value)} placeholder={active ? '给正在运行的 Agent 补充指令…' : id ? '输入消息，或粘贴图片…' : '输入第一条消息，或粘贴图片…'} onPaste={e => {
+          <InputGroupTextarea className="min-h-16 max-h-[24dvh] p-3" ref={composerInput} id="chat-message" value={text} onChange={e => writeDraft(e.target.value)} placeholder={active ? '给正在运行的 Agent 补充指令…' : id ? '输入消息，或粘贴图片…' : '输入第一条消息，或粘贴图片…'} onPaste={e => {
             const images = [...e.clipboardData.files].filter(file => file.type.startsWith('image/'));
             if (images.length && !settingsLocked) {e.preventDefault(); upload(images);}
           }} onKeyDown={e => {
             if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
             e.preventDefault(); e.currentTarget.form?.requestSubmit();
           }} />
-          <InputGroupAddon align="block-end" className="chat-composer-bar">
+          <InputGroupAddon align="block-end" className="gap-1 border-t border-input bg-muted px-2 py-2">
             <Input ref={fileInput} type="file" hidden multiple accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => {if (e.currentTarget.files) upload(e.currentTarget.files); e.currentTarget.value = '';}} />
-            <InputGroupButton type="button" variant="ghost" size="icon-sm" aria-label="添加图片" disabled={settingsLocked} onClick={() => fileInput.current?.click()}><Paperclip /></InputGroupButton>
-            <Popover open={modelOpen} onOpenChange={open => {setModelOpen(open); if (open) setModelProvider(conversation?.settings.providerId ?? '');}}>
-              <PopoverTrigger asChild><InputGroupButton type="button" variant="ghost" size="sm" className="chat-model" aria-label="选择模型" disabled={settingsLocked}><span>{conversation?.settings.model || provider?.name || '选择模型'}</span><ChevronDown /></InputGroupButton></PopoverTrigger>
-              <PopoverContent container={container} align="start" side="top" sideOffset={8} className="chat-model-picker" aria-label="模型选择" onOpenAutoFocus={event => {
-                  const input = event.currentTarget instanceof HTMLElement ? event.currentTarget.querySelector('input') : null;
-                  if (input) {event.preventDefault(); input.focus();}
-                }}>
-                  {pickerProviders.length > 1 && <NativeSelect aria-label="执行提供方" value={pickerProvider?.id ?? ''} onChange={e => setModelProvider(e.target.value)}>{pickerProviders.map(p => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}</NativeSelect>}
-                  {pickerProvider ? <ModelCommand key={pickerProvider.id} label="搜索模型" onKeyDown={event => {
-                    if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.stopPropagation();
-                  }}>
-                    <CommandInput aria-label="搜索模型" placeholder="搜索模型" />
-                    <CommandList className="max-h-[min(40dvh,260px)]">
-                      <CommandEmpty>没有匹配的模型</CommandEmpty>
-                      {models.map(model => {
-                        const sameProvider = pickerProvider.id === conversation?.settings.providerId;
-                        const selected = sameProvider && model.value === conversation?.settings.model;
-                        return <CommandItem key={model.value} value={`model:${model.value}`} keywords={[model.label]} disabled={settingsLocked} onSelect={() => void saveSettings({
-                          providerId: pickerProvider.id, model: model.value, thinking: sameProvider ? effort : '',
-                        }, () => setModelOpen(false))}>
-                          <span className="min-w-0 flex-1 wrap-anywhere">{model.label}</span>{selected && <Check aria-label="当前模型" />}
-                        </CommandItem>;
-                      })}
-                    </CommandList>
-                  </ModelCommand> : <p role="status">{catalog ? '没有可用的执行提供方' : '正在读取模型目录…'}</p>}
-                  {!!config?.warning && <small>{config.warning}</small>}
-                </PopoverContent>
-            </Popover>
+            <InputGroupButton type="button" variant="outline" size="icon-sm" className="rounded-full" aria-label="添加图片" disabled={settingsLocked} onClick={() => fileInput.current?.click()}><Plus /></InputGroupButton>
+            <ModelSelector open={modelOpen} onOpenChange={setModelOpen} modal="trap-focus">
+              <ModelSelectorTrigger render={<InputGroupButton ref={modelTrigger} type="button" variant="ghost" size="sm" className="min-w-0 max-w-[min(38vw,350px)] shrink" aria-label="选择模型" disabled={settingsLocked} />}>
+                <span className="truncate">{conversation?.settings.model || provider?.name || '选择模型'}</span><ChevronDown />
+              </ModelSelectorTrigger>
+              <ModelSelectorContent container={container} initialFocus={modelSearch} finalFocus={modelTrigger}>
+                <ModelSelectorInput ref={modelSearch} aria-label="搜索模型" placeholder="搜索模型" onKeyDown={event => {
+                  if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.stopPropagation();
+                }} />
+                <ModelSelectorList className="max-h-[min(50dvh,320px)]">
+                  <ModelSelectorEmpty>{!catalog ? '正在读取模型目录…' : pickerProviders.length ? '没有匹配的模型' : '没有可用的执行提供方'}</ModelSelectorEmpty>
+                  {pickerProviders.map(candidate => {
+                    const config = catalog?.configs[candidate.id];
+                    const sameProvider = candidate.id === conversation?.settings.providerId;
+                    const models = [{value:'', label:'继承提供方设置'}, ...(config?.models ?? []).filter(model => model.value)];
+                    return <ModelSelectorGroup key={candidate.id} heading={candidate.name} className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:gap-1">
+                      {models.map(model => <ModelSelectorItem key={model.value} className="min-h-11 cursor-pointer border border-transparent px-3 data-[selected=true]:border-input" value={JSON.stringify([candidate.id, model.value])} keywords={[candidate.name, model.label]} disabled={settingsLocked} data-checked={sameProvider && model.value === conversation?.settings.model} onSelect={() => void saveSettings({
+                        providerId: candidate.id, model: model.value, thinking: sameProvider ? effort : '',
+                      }, () => setModelOpen(false))}>
+                        <ModelSelectorName>{model.label}</ModelSelectorName>
+                      </ModelSelectorItem>)}
+                      {config?.warning && <p className="px-2 py-1 text-xs text-muted-foreground wrap-anywhere">{config.warning}</p>}
+                    </ModelSelectorGroup>;
+                  })}
+                </ModelSelectorList>
+                {error && <p role="alert" className="px-3 pb-2 text-sm text-destructive">{error}</p>}
+              </ModelSelectorContent>
+            </ModelSelector>
             {!!effortLevels.length && <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild><InputGroupButton type="button" variant="ghost" size="sm" aria-label="思考强度" className="chat-effort" disabled={settingsLocked}><Brain /><span>{effort ? effortLabels[effort] ?? effort : '默认'}</span><ChevronDown /></InputGroupButton></DropdownMenuTrigger>
               <DropdownMenuContent container={container} side="top" align="start" aria-label="思考强度">
@@ -351,33 +423,35 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
               if (conversation) setPanel('tools');
               else void task(async () => { if (await create()) setPanel('tools'); });
             }}><Settings2 /><span>应用工具</span>{conversation && <span>{conversation.settings.tools.length}/{catalog?.toolLimit ?? 100}</span>}</InputGroupButton>
-            <div className="chat-spacer" />
-            {active && <InputGroupButton type="button" variant="outline" size="icon-sm" aria-label="停止运行" disabled={busy || !active.runId || !!active.stopRequested || !!pending || !!currentRequest} onClick={() => run('stop', {runId: active.runId})}><Square /></InputGroupButton>}
-            <InputGroupButton type="submit" size="icon-sm" aria-label={active ? '补充指令' : '发送消息'} disabled={busy || !!pending || !!currentRequest || (!id && (!ready || !catalog || retryCreate)) || (!!active && !active.runId) || (!text.trim() && (!!active || !conversation?.attachments.length))}><ArrowUp /></InputGroupButton>
+            {active && <InputGroupButton type="button" variant="outline" size="icon-sm" className="ml-auto rounded-full" aria-label="停止运行" disabled={busy || !active.runId || !!active.stopRequested || !!pending || !!currentRequest} onClick={() => run('stop', {runId: active.runId})}><Square /></InputGroupButton>}
+            <InputGroupButton type="submit" size="icon-sm" className={active ? 'rounded-full' : 'ml-auto rounded-full'} aria-label={active ? '补充指令' : '发送消息'} disabled={busy || !!pending || !!currentRequest || (!id && (!ready || !catalog || retryCreate)) || (!!active && !active.runId) || (!text.trim() && (!!active || !conversation?.attachments.length))}><ArrowUp /></InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
       </form>}
     </main>
-    {panel && <Dialog open modal="trap-focus" onOpenChange={open => {if (!open) setPanel(null);}}>
-      <DialogContent container={container} className="chat-dialog">
+    {panel && panel !== 'confirm' && <Dialog open modal="trap-focus" onOpenChange={open => {if (!open) setPanel(null);}}>
+      <DialogContent container={container} className="max-h-[86dvh] overflow-auto overscroll-contain sm:max-w-xl">
         <DialogHeader><DialogTitle>{title[panel]}</DialogTitle></DialogHeader>
         {panel === 'tools' && conversation && catalog && <Tools key={id} conversation={conversation} catalog={catalog} busy={settingsLocked} save={settings => saveSettings(settings, () => setPanel(null))} />}
-        {panel === 'run' && conversation && <div className="chat-panel">{active && <p>当前执行 · {active.observedStatus || '正在启动'}{active.runId && <><br /><code>{active.runId}</code></>}</p>}{!conversation.operations.length && <p>还没有执行记录</p>}{[...conversation.operations].reverse().map(op => <section className="chat-delivery" key={op.key}><strong>{{send:'发送', message:'补充', stop:'停止', answer:'回答'}[op.kind] ?? op.kind}</strong> · {{succeeded:'已受理', rejected:'已拒绝', failed:'失败'}[op.status] ?? '待确认'}{(op.error || op.recoveryNotice) && <p>{op.recoveryNotice || op.error}</p>}<Collapsible><CollapsibleTrigger asChild><Button variant="link" size="sm">请求编号</Button></CollapsibleTrigger><CollapsibleContent><code>{op.key}</code></CollapsibleContent></Collapsible></section>)}</div>}
+        {panel === 'run' && conversation && <div className="grid gap-3">{active && <p>当前执行 · {active.observedStatus || '正在启动'}{active.runId && <><br /><code>{active.runId}</code></>}</p>}{!conversation.operations.length && <p>还没有执行记录</p>}{[...conversation.operations].reverse().map(op => <Card size="sm" key={op.key}><CardHeader><CardTitle>{{send:'发送', message:'补充', stop:'停止', answer:'回答'}[op.kind] ?? op.kind} · {{succeeded:'已受理', rejected:'已拒绝', failed:'失败'}[op.status] ?? '待确认'}</CardTitle></CardHeader><CardContent>{(op.error || op.recoveryNotice) && <p>{op.recoveryNotice || op.error}</p>}<Collapsible><CollapsibleTrigger asChild><Button variant="link" size="sm">请求编号</Button></CollapsibleTrigger><CollapsibleContent><code>{op.key}</code></CollapsibleContent></Collapsible></CardContent></Card>)}</div>}
         {panel === 'scope' && <Scope api={api} id={id} run={task} busy={busy} />}
         {panel === 'delivery' && conversation && <Delivery conversation={conversation} busy={busy} refresh={() => task(async () => update(await api('delivery', {id})))} />}
         {panel === 'image' && image && <img className="chat-image" src={image.src} alt={image.name} />}
-        {panel === 'manage' && conversation && <div className="chat-panel">
-          <form onSubmit={e => {e.preventDefault(); const title = String(new FormData(e.currentTarget).get('title')).trim(); void task(async () => {update(await api('edit', {id, patch: JSON.stringify({title})})); setPanel(null);});}}><label>名称<Input name="title" defaultValue={conversation.title} required maxLength={120} /></label><Button disabled={busy} type="submit">重命名</Button></form>
-          <div className="chat-actions">
+        {panel !== 'tools' && panel !== 'image' && !conversation && <p role="status">{readError || '正在读取对话…'}</p>}
+        {(panel === 'manage' || panel === 'rename') && conversation && (<form onSubmit={e => {e.preventDefault(); const title = String(new FormData(e.currentTarget).get('title')).trim(); void task(async () => {update(await api('edit', {id, patch: JSON.stringify({title})})); setPanel(null);});}}><FieldGroup className="gap-3"><Field><FieldLabel htmlFor="chat-rename">对话名称</FieldLabel><Input id="chat-rename" name="title" defaultValue={conversation.title} required maxLength={120} /></Field><div className="flex justify-end"><Button disabled={busy} type="submit">重命名</Button></div></FieldGroup></form>)}
+        {panel === 'manage' && conversation && <div className="grid gap-4">
+          <div className="flex flex-wrap gap-2">
             {(['pinned', 'archived'] as const).map((field, i) => <Button key={field} variant="outline" disabled={busy} onClick={() => void task(async () => {update(await api('edit', {id, patch: JSON.stringify({[field]: !conversation[field]})})); setPanel(null);})}>{`${conversation[field] ? '取消' : ''}${['置顶', '归档'][i]}`}</Button>)}
             <Button variant="outline" onClick={() => setPanel('run')}>执行记录</Button><Button variant="outline" onClick={() => setPanel('delivery')}>应用交付</Button><Button variant="outline" onClick={() => setPanel('scope')}>Mind 学习范围</Button>
-            <Button variant="outline" disabled={busy || !!active || !!pending} onClick={() => {if (confirm('开始新的执行上下文？现有消息仍保留。')) void task(async () => {update(await api('new-context', {id, confirmed: true})); setPanel(null);});}}>重置执行上下文</Button>
-            <Button variant="destructive" disabled={busy || !!active || !!pending || !!currentRequest} onClick={() => {if (confirm(`删除「${conversation.title}」？`)) void task(async () => {await api('delete', {id, confirmed: true}); sessionStorage.removeItem(draftKey(id)); select(''); await refreshList();});}}>删除对话</Button>
+            <Button variant="outline" disabled={!canChangeContext} onClick={event => {confirmationTrigger.current = event.currentTarget; setConfirmation('new-context');}}>重置执行上下文</Button>
+            <Button variant="destructive" disabled={!canChangeContext || !!currentRequest} onClick={event => {confirmationTrigger.current = event.currentTarget; setConfirmation('delete');}}>删除对话</Button>
           </div>
         </div>}
-        {error && <p role="alert" className="chat-panel-error">{error}</p>}
+        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+        {panel === 'manage' && confirmationDialog}
       </DialogContent>
     </Dialog>}
+    {panel === 'confirm' && confirmationDialog}
   </div>;
 }
 

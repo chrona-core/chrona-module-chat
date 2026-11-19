@@ -11,11 +11,21 @@ async page => {
     if (conversation) await textarea.waitFor();
   }
   for (const colorScheme of ['light', 'dark']) for (const [width, height] of [[1440, 900], [1024, 768], [390, 844]]) {
-    await page.emulateMedia({colorScheme});
+    await page.emulateMedia({colorScheme, reducedMotion:'reduce'});
     await page.setViewportSize({width, height});
     await open('long');
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width} ${colorScheme} overflows`);
     assert(await textarea.isVisible(), 'composer must be visible');
+    const send = await button('发送消息').boundingBox();
+    assert(send && send.x >= 0 && send.x + send.width <= width, 'send control must fit inside the viewport');
+    assert(await textarea.evaluate(el => {
+      const group = el.closest('[data-slot=input-group]');
+      const toolbar = group.querySelector('[data-align=block-end]');
+      const style = getComputedStyle(toolbar);
+      return Number.parseFloat(style.borderTopWidth) >= 1 &&
+        style.backgroundColor !== getComputedStyle(group).backgroundColor &&
+        toolbar.getBoundingClientRect().top >= el.getBoundingClientRect().bottom - 1;
+    }), 'composer toolbar must have its own surface and divider below the text area');
     assert(await page.locator('.chat-header').evaluate(el => el.getBoundingClientRect().top >= 0), 'the toolbar must stay on screen');
     const scroller = page.getByRole('region', {name:'消息记录'});
     assert(await scroller.evaluate(el => el.scrollHeight > el.clientHeight), 'long transcript must scroll inside the workbench');
@@ -23,7 +33,19 @@ async page => {
       await button('打开会话列表').click();
       await page.getByRole('navigation', {name:'会话列表'}).waitFor();
       await page.keyboard.press('Escape');
-      assert(await button('打开会话列表').evaluate(el => el === document.activeElement), 'drawer trigger should regain focus');
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '打开会话列表');
+    }
+    const tabs = page.getByRole('tablist', {name:'筛选对话'});
+    if (width < 720) await button('打开会话列表').click();
+    const unarchivedTab = tabs.getByRole('tab', {name:'未归档'});
+    await unarchivedTab.press('ArrowRight');
+    await tabs.getByRole('tab', {name:'已归档', selected:true}).waitFor();
+    await page.getByRole('tabpanel', {name:'已归档'}).getByText('没有归档对话').waitFor();
+    await unarchivedTab.click();
+    await page.getByRole('tabpanel', {name:'未归档'}).getByRole('button', {name:'另一段会话', exact:true}).waitFor();
+    if (width < 720) {
+      await page.keyboard.press('Escape');
+      await tabs.waitFor({state:'hidden'});
     }
     await button('搜索消息').click();
     await page.getByPlaceholder('搜索本对话的消息').fill('unique missing text');
@@ -32,6 +54,19 @@ async page => {
     await button('选择模型').click();
     const picker = page.getByRole('dialog', {name: '模型选择'});
     const search = picker.getByRole('combobox', {name:'搜索模型'});
+    const modelGroup = picker.getByRole('group', {name:'Pi（隔离提供方）'});
+    await modelGroup.waitFor();
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '搜索模型');
+    const offline = modelGroup.getByRole('option', {name:/offline/});
+    await offline.hover();
+    await page.waitForFunction(() => {
+      const group = document.querySelector('[cmdk-group-items]');
+      const active = group?.querySelector('[role=option][data-selected=true]');
+      const inactive = group?.querySelector('[role=option][data-selected=false]');
+      if (!active || !inactive) return false;
+      const current = getComputedStyle(active), other = getComputedStyle(inactive);
+      return active.offsetHeight >= 44 && current.backgroundColor !== other.backgroundColor && current.borderTopColor !== other.borderTopColor;
+    });
     await search.fill('offline');
     await search.press('Enter');
     await picker.waitFor({state:'hidden'});
@@ -39,12 +74,19 @@ async page => {
     await button('选择模型').click();
     await search.waitFor();
     await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '搜索模型');
+    assert(await search.evaluate(el => {
+      const inputGroup = el.closest('[data-slot=input-group]');
+      return getComputedStyle(el).outlineStyle === 'none' &&
+        getComputedStyle(inputGroup).boxShadow !== 'none';
+    }), 'model search focus ring must follow the rounded input group');
     await page.keyboard.press('Escape');
     await picker.waitFor({state:'hidden'});
     await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '选择模型');
     const effort = button('思考强度');
     await effort.click();
-    await page.getByRole('menuitemradio', {name:'高', exact:true}).click();
+    const highEffort = page.getByRole('menuitemradio', {name:'高', exact:true});
+    await highEffort.click();
+    await highEffort.waitFor({state:'hidden'});
     await page.waitForFunction(() => document.querySelector('button[aria-label="思考强度"]').textContent === '高');
     await effort.click();
     assert(await page.getByRole('menuitemradio', {name:'高', exact:true}).getAttribute('aria-checked') === 'true', 'Effort must display the saved choice');
@@ -65,7 +107,12 @@ async page => {
     await toolsButton.click();
     await tools.getByRole('button', {name:'全部关闭'}).click();
     await tools.getByRole('button', {name:/author/}).click();
-    await tools.getByRole('button', {name:'启用本组'}).click();
+    const tool = tools.getByRole('checkbox', {name:'submit'});
+    await tool.waitFor();
+    const checkbox = await tool.boundingBox();
+    assert(checkbox && Math.abs(checkbox.height - checkbox.width) < 1, 'host styles must preserve a square tool checkbox');
+    await tools.getByText('submit', {exact:true}).click();
+    assert(await tool.getAttribute('aria-checked') === 'true', 'tool field label should toggle the checkbox');
     await tools.getByRole('button', {name:'保存工具'}).click();
     await tools.waitFor({state:'hidden'});
     await button('应用工具（已选 1/100）').waitFor();
@@ -155,16 +202,64 @@ async page => {
     return page.getByRole('navigation', {name:'会话列表'});
   }
   let sidebar = await list();
-  const filter = page.getByRole('combobox', {name:'筛选对话'});
-  assert(await sidebar.getByRole('button', {name:'另一段会话'}).count() === 0, 'archived conversations start out of the current list');
-  await filter.selectOption('archived');
-  await sidebar.getByRole('button', {name:'另一段会话'}).click();
+  const filter = page.getByRole('tablist', {name:'筛选对话'});
+  assert(await sidebar.getByRole('button', {name:'另一段会话', exact:true}).count() === 0, 'archived conversations start out of the current list');
+  await filter.getByRole('tab', {name:'已归档'}).click();
+  await sidebar.getByRole('button', {name:'另一段会话', exact:true}).click();
   await button('管理对话').click();
   await button('取消归档').click();
   await page.getByRole('dialog', {name:'管理对话'}).waitFor({state:'hidden'});
   sidebar = await list();
   await sidebar.getByText('没有归档对话').waitFor();
-  await filter.selectOption('current');
-  await sidebar.getByRole('button', {name:'另一段会话'}).waitFor();
-  return 'six viewport/theme checks, centered first composer, stable dialog, model picker, grouped tools, live text, tool pairing, archive filter and workbench regressions passed';
+  await filter.getByRole('tab', {name:'未归档'}).click();
+  await sidebar.getByRole('button', {name:'另一段会话', exact:true}).waitFor();
+  await open('sidebar-actions');
+  let rowActions = (await list()).getByRole('button', {name:'操作：另一段会话', exact:true});
+  await rowActions.press('Enter');
+  const rowMenu = page.getByRole('menu', {name:'操作：另一段会话'});
+  await rowMenu.getByRole('menuitem', {name:'置顶', exact:true}).click();
+  await page.waitForFunction(() => window.fixtureCalls.some(call => call.name === 'edit' && call.args.id === 'second' && JSON.parse(call.args.patch).pinned === true));
+  assert(new URL(page.url()).searchParams.get('conversation') === 'fixture', 'pinning another row must keep the open conversation');
+  await rowActions.click();
+  await rowMenu.getByRole('menuitem', {name:'重命名', exact:true}).click();
+  const rename = page.getByRole('dialog', {name:'重命名对话'});
+  await rename.getByLabel('对话名称').fill('重命名后的对话');
+  await rename.getByRole('button', {name:'重命名'}).click();
+  await page.waitForFunction(() => window.fixtureCalls.some(call => call.name === 'edit' && call.args.id === 'second' && JSON.parse(call.args.patch).title === '重命名后的对话'));
+  await rename.waitFor({state:'hidden'});
+  rowActions = (await list()).getByRole('button', {name:'操作：重命名后的对话', exact:true});
+  await rowActions.click();
+  await page.getByRole('menuitem', {name:'删除对话', exact:true}).click();
+  const rowConfirmation = page.getByRole('alertdialog', {name:'删除对话？'});
+  await rowConfirmation.getByText(/将删除「重命名后的对话」/).waitFor({timeout:3000}).catch(async error => {
+    throw new Error(`${error.message}\n${await page.locator('[role=alertdialog]').allTextContents()}`);
+  });
+  await rowConfirmation.getByRole('button', {name:'取消'}).click();
+  await rowConfirmation.waitFor({state:'hidden'});
+  assert(await page.evaluate(() => window.fixtureCalls.every(call => call.name !== 'delete')), 'canceling a row deletion must leave the conversation intact');
+
+  await open('settings');
+  await button('管理对话').click();
+  await button('Mind 学习范围').click();
+  const scope = page.getByRole('form', {name:'Mind 学习范围设置'});
+  await scope.getByText('将此对话设为私密', {exact:true}).click();
+  await scope.getByRole('button', {name:'保存范围'}).click();
+  await page.waitForFunction(() => window.fixtureCalls.some(call => call.name === 'observation-scope' && call.args.private === true && call.args.expectedRevision === 1));
+
+  await open('confirmation');
+  await button('管理对话').click();
+  const manage = page.getByRole('dialog', {name:'管理对话'});
+  const remove = manage.getByRole('button', {name:'删除对话', exact:true});
+  await remove.click();
+  const confirmation = page.getByRole('alertdialog', {name:'删除对话？'});
+  await confirmation.waitFor();
+  await page.waitForFunction(() => document.activeElement?.textContent === '取消');
+  await page.keyboard.press('Escape');
+  await confirmation.waitFor({state:'hidden'});
+  await page.waitForFunction(() => document.activeElement?.textContent === '删除对话');
+  assert(await page.evaluate(() => window.fixtureCalls.every(call => call.name !== 'delete')), 'Escape must cancel without deleting');
+  await remove.click();
+  await confirmation.getByRole('button', {name:'删除对话', exact:true}).click();
+  await page.waitForFunction(() => window.fixtureCalls.some(call => call.name === 'delete' && call.args.confirmed === true));
+  return 'six viewport/theme checks, composer, dialogs, model picker, streaming, archive and workbench regressions passed';
 }

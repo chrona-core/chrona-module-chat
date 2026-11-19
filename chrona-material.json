@@ -16,9 +16,11 @@
     "cn.ts",
     "context-admission.bun.test.ts",
     "delivery.ts",
+    "elements/alert-dialog.tsx",
     "elements/alert.tsx",
     "elements/attachment.tsx",
     "elements/bubble.tsx",
+    "elements/card.tsx",
     "elements/checkbox.tsx",
     "elements/code-block.tsx",
     "elements/collapsible.tsx",
@@ -26,14 +28,19 @@
     "elements/dialog.tsx",
     "elements/dropdown-menu.tsx",
     "elements/empty.tsx",
+    "elements/field.tsx",
     "elements/input-group.tsx",
+    "elements/label.tsx",
     "elements/message-scroller.tsx",
     "elements/message.tsx",
+    "elements/model-selector.tsx",
     "elements/native-select.tsx",
     "elements/popover.tsx",
     "elements/questionnaire.tsx",
+    "elements/separator.tsx",
     "elements/sheet.tsx",
     "elements/sidebar-menu.tsx",
+    "elements/tabs.tsx",
     "elements/trace.tsx",
     "frontend-context.ts",
     "host-agent.integration.test.ts",
@@ -69,11 +76,11 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "a22ddac515f7d37b7f3c6b06fa37bb5941d7ec7c5168243a5133c70c3eba2e30"
+      "sha256": "1b7af07d85bc8f286c9a3121be83af220a841c1731b9df5f414f64e6e4c1e477"
     },
     {
       "path": "dist/ui.css",
-      "sha256": "28dbbe698bbbb957f5e22c3627b8c519cfa76734a048a4bcaf9e3c68b3708c8a"
+      "sha256": "aad05497f61eeb798042385c488c09c8a0eb236b2c0f233825afdff5330c3016"
     }
   ],
   "build": {
@@ -81,7 +88,7 @@
       "bun install --frozen-lockfile --ignore-scripts --backend=copyfile",
       "bun run build"
     ],
-    "toolchain": "Bun 1.4.2; Node.js 22.22.3; TypeScript 5.9.3; Vite 8.3.8",
+    "toolchain": "Bun 1.4.4; Node.js 22.23.4; TypeScript 5.9.3; Vite 8.3.8",
     "target": "browser JavaScript; Chrona TypeScript host"
   }
 }

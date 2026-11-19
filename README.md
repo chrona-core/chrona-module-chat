@@ -20,8 +20,8 @@ Chat 是 Chrona 的独立中文对话工作台，管理自己的会话、草稿�
 
 ```sh
 bun install --frozen-lockfile --ignore-scripts
-bun run test
 bun run build
+bun run test
 ```
 
 `bun run build` 先检查严格 TypeScript，再用 Vite 构建 `dist/ui.js` 和 `dist/ui.css`。构建需要 Bun 和 Node.js（20.19+ 或 22.12+）。工作台按 AI Elements 的 Chat、Prompt Input、Model Selector 和 Tool 示例组合组件。会话导航、弹窗、筛选和表单使用 shadcn/ui。`elements/` 保存项目使用的 registry 组件，适配了本地导入、中文标签和 Web 的 portal 容器。`index.ts` 在激活时注册两个制品。`chrona-material.json` 列出源码、构建命令及产物摘要；修改或重建产物后应同步摘要和实际使用的工具链版本。
@@ -32,6 +32,7 @@ bun run build
 | --- | --- |
 | `index.ts`、`module.json` | 应用入口、工具合同与 Web 注册 |
 | `state.ts` | 私有会话存储、操作快照与执行恢复 |
+| `observations.ts`、`mind-updates.ts`、`mind-tasks.ts` | 持久观察事件与学习范围、Mind 更新读取与任务代理 |
 | `tool-selection.ts`、`delivery.ts` | 工具发现与选择、交付回执识别 |
 | `chat.tsx` | React 挂载、会话导航、输入与命令恢复 |
 | `thread.tsx` | AI Elements 消息、工具轨迹、图片与 Agent 提问 |
@@ -41,9 +42,15 @@ bun run build
 
 ## 验证
 
-`bun run test` 运行会话状态、Agent 准入、回执恢复、Web 注册、Mind 观察和任务代理的离线套件。
+| 验证 | 入口 | 依赖 |
+| --- | --- | --- |
+| 离线套件 | `bun run test` | 本仓库依赖和 `bun run build` 产出的 Web 制品。覆盖会话状态、Agent 准入、回执恢复、Web 注册、Mind 观察和任务代理。 |
+| Chrona 应用检查 | `module.json` 声明的 `test.ts` | 由 Chrona 应用检查流程提供 `chrona/testing` SDK 进程测试工具。 |
+| Chrona 内核集成 | `host-agent.integration.test.ts`，运行命令见下方 | 同级 `../Chrona` checkout、已安装的内核依赖、已生成的 Prisma 客户端和临时 SQLite 数据库。使用离线 Provider 替身。 |
+| Chat 与 Mind 组合测试 | `bun test ./integration/chat-mind-updates.bun.test.ts` | 同级 `../chrona-module-mind` checkout 及其依赖。 |
+| 浏览器检查 | `browser-check.js`，预览步骤见下方 | 前端构建产物、本地 HTTP 服务和 Playwright CLI。 |
 
-`host-agent.integration.test.ts` 是额外的 Chrona 仓库集成测试，使用当前 checkout 的内核、临时数据库和离线 Provider 替身。它依赖仓库依赖及已生成的 Prisma 客户端，不属于上述独立套件。仓库数据库模块还会在导入时初始化测试库，因此从本目录运行时需显式指定 checkout 内的迁移目录，并隔离默认数据库与配置：
+内核集成测试会在导入数据库模块时初始化数据库。从本目录运行时指定同级 Chrona checkout 的迁移目录，并隔离数据库和配置。
 
 ```sh
 (
@@ -53,11 +60,9 @@ bun run build
   TMPDIR="$test_dir" \
   CHRONA_CONFIG_DIR="$test_dir/config" \
   DATABASE_URL="file:$test_dir/root-test.db" \
-  CHRONA_MIGRATIONS_DIR="$PWD/../../../../../../../prisma/migrations" \
+  CHRONA_MIGRATIONS_DIR="$PWD/../Chrona/packages/db/prisma/migrations" \
   bun test ./host-agent.integration.test.ts
 )
 ```
-
-`test.ts` 是 `module.json` 声明的应用检查入口，还使用宿主提供的 `chrona/testing` SDK 进程测试工具；应通过 Chrona 的应用检查流程运行。
 
 浏览器预览运行 `bun run build` 和 `bun run browser-fixture.ts`，然后通过本地静态 HTTP 服务打开 `browser-fixture.html`。用 `playwright-cli run-code --filename=browser-check.js` 运行检查，覆盖三个视口和明暗主题、空白页直接发送首条消息、工具弹窗打开时导航位置稳定、就地选择模型、按应用配置工具、运行中增量正文、工具调用结果配对、刷新后核对原发送、运行中补充和停止、提问及归档恢复。预览使用合成数据和宿主样式夹具。
