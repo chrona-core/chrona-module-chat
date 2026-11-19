@@ -16,8 +16,9 @@ let releaseProviders!:()=>void;const providersGate=new Promise<void>(resolve=>{r
 const run={runId:'sdk-run',contextId:'sdk-context',status:'running',active:true};
 const m=await startModule('index.ts',{stubs:{
   'modules.list':()=>({items:[{id:'chat',name:'chat',activeHash:'fixture-hash'}],nextCursor:null}),
-  'modules.describe':(args: {target?: unknown})=>args.target ? {inputSchema:{properties:{config:{properties:{thinking:{enum:['low','high']}}}}}} : ({items:[{target:{moduleId:'chat',tool:'list'},description:'self'}],nextCursor:null}),
-  'agent.providers':async()=>{await providersGate;return {items:[{id:'pi',available:true,hash:'p',revision:'v',moduleId:'pi',configuration:{tool:'configure'},capabilities:{conversation:true,images:true}}],nextCursor:null};},
+  'modules.describe':(args: {target?: unknown})=>args.target ? {inputSchema:{properties:{}}} : ({items:[{target:{moduleId:'chat',tool:'list'},description:'self'}],nextCursor:null}),
+  'agent.providers':async()=>{await providersGate;return {items:[{id:'pi',available:true,hash:'p',revision:'v',moduleId:'pi',configuration:{tool:'configure'},inspections:[{query:'models',scope:'provider',version:1}],capabilities:{conversation:true,images:true}}],nextCursor:null};},
+  'agent.inspect':(args:unknown)=>{assert.deepEqual(args,{providerId:'pi',query:'models',version:1,args:{}});return {query:'models',version:1,data:{defaultModel:'pi/example',nextCursor:null,models:[{id:'pi/example',label:'Example',effort:{options:['low','high'],default:'low'}}]}};},
   'agent.run':(a:{tools: unknown},o:{mode?: string; key?: string})=>{assert.notEqual(o.mode,'async');assert.ok(o.key);assert.deepEqual(a.tools,[{moduleId:'chat',tool:'list'}]);return run;},
   'agent.stop':(_a:unknown,o:{mode?: string})=>{assert.notEqual(o.mode,'async');stopped=true;return {...run,status:'finished',active:false,stopConfirmed:true};},
   'agent.read':()=>({run:{...run,status:stopped?'finished':'running',active:!stopped},items:[],nextCursor:stopped?null:'cursor',ended:stopped,interactions:[],transcript:[]}),
@@ -35,7 +36,7 @@ try {
   const discoveryStarted=m.calls.some((call:{params:{target:unknown}})=>call.params.target==='modules.describe');
   releaseProviders();const catalog=await catalogRead;
   assert.ok(discoveryStarted,'tool discovery must not wait for Provider health');
-  assert.deepEqual(catalog.configs.pi.thinking,['low','high']);
+  assert.deepEqual(catalog.configs.pi.models,[{value:'pi/example',label:'Example',effort:{options:['low','high'],default:'low'}}]);
   let c=await send('create',{requestKey:'sdk-create'});const duplicate=await send('create',{requestKey:'sdk-create'});assert.equal(c.id,duplicate.id);assert.equal(c.settings.providerId,'pi');assert.deepEqual(c.settings.tools,[{moduleId:'chat',tool:'list'}]);
   c=await send('draft',{id:c.id,revision:0,patch:JSON.stringify({draft:'SDK hello'})});
   c=await send('execute',{id:c.id,key:'sdk-start',kind:'send',input:'{}'});assert.equal(c.active.runId,'sdk-run');

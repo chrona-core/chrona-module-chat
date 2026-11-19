@@ -7,11 +7,27 @@ import { readMindUpdates } from './mind-updates';
 import { mindTaskCall } from './mind-tasks';
 import { discoverTools, defaultTools, TOOL_LIMIT } from './tool-selection';
 import type { Conversation, Delivery, ModuleDirectory, ProviderConfig, ProviderList } from './view-types';
-type InputSchema = { properties?: Record<string, InputSchema | undefined>; enum?: string[] };
+type InputSchema = { properties?: Record<string, InputSchema | undefined> };
 type ToolArgs = { id: string; requestKey: string; emptyTools?: boolean; observe?: boolean; patch: string;
  key: string; kind: string; input: string; confirmed: boolean; revision: number; attachmentId: string; type: string; receiptId?: string };
 const store=new Store(chrona.paths.data,chrona.paths.content,chrona.call);
 const dep=(name:string,tool:string)=>{const moduleId=chrona.dependencies[name];if(!moduleId)throw Error(name+' 未安装或未绑定');return {moduleId,tool};};
+function readModelsPage(value: unknown): {defaultModel:string|null;nextCursor:string|null;models:ProviderConfig['models']} {
+ if(!value || typeof value!=='object' || !('data' in value) || !value.data || typeof value.data!=='object') throw Error('模型目录响应无效');
+ const {defaultModel,nextCursor,models}=value.data as Record<string,unknown>;
+ if((defaultModel!==null && typeof defaultModel!=='string') || (nextCursor!==null && typeof nextCursor!=='string') || !Array.isArray(models) || models.length>100) throw Error('模型目录分页无效');
+ const items=models.map((model:unknown)=>{
+  if(!model || typeof model!=='object') throw Error('模型条目无效');
+  const {id,label,effort}=model as Record<string,unknown>;
+  if(typeof id!=='string' || !id || typeof label!=='string' || !label) throw Error('模型条目无效');
+  if(effort===null) return {value:id,label,effort};
+  if(!effort || typeof effort!=='object') throw Error('模型思考强度无效');
+  const {options,default:initial}=effort as Record<string,unknown>;
+  if(!Array.isArray(options) || !options.length || options.length>32 || options.some(v=>typeof v!=='string' || !v) || (initial!==null && (typeof initial!=='string' || !options.includes(initial)))) throw Error('模型思考强度无效');
+  return {value:id,label,effort:{options,default:initial}};
+ });
+ return {defaultModel,nextCursor,models:items};
+}
 async function catalog(callId?:string){
  const started=performance.now(),startedAt=new Date().toISOString();
  const spans:{target:string;startMs:number;durationMs:number}[]=[];
@@ -24,18 +40,42 @@ async function catalog(callId?:string){
  const [providers,tools]=await Promise.all([call('agent.providers',{}) as Promise<ProviderList>,discoverTools(call)]);
  const configs:Record<string,ProviderConfig>={};
  await Promise.all(providers.items.map(async p=>{
-  const cfg:ProviderConfig={models:[],thinking:[],warning:''};configs[p.id]=cfg;
+  const cfg:ProviderConfig={models:[],defaultModel:null,warning:''};configs[p.id]=cfg;
   const warnings:string[]=[];
   await Promise.all([(async()=>{
   if(p.configuration){
-   try{const target={moduleId:p.moduleId,tool:p.configuration.tool};const contract=await call('modules.describe',{target});const schema=(contract as {inputSchema?:InputSchema}).inputSchema;cfg.thinking=schema?.properties?.config?.properties?.thinking?.enum??schema?.properties?.form?.properties?.thinking?.enum??[];
+   try{const target={moduleId:p.moduleId,tool:p.configuration.tool};const contract=await call('modules.describe',{target});const schema=(contract as {inputSchema?:InputSchema}).inputSchema;
     // This is a read-only view of the discovered configuration contract.
     if(schema?.properties?.view){const view=await call(target,{view:true});cfg.view=view;}
    }catch(e){warnings.push((e as Error).message);console.error(JSON.stringify({component:'chat',event:'configuration_read_failed',provider:p.id,error:String(e)}));}
   }
   })(),(async()=>{
-  if(p.name==='Pi'||p.id==='pi'){
-   try{const target={moduleId:p.moduleId,tool:'models'};const models=await call<{options:ProviderConfig['models'];warnings:string[]}>(target,{});cfg.models=models.options;warnings.push(...models.warnings);}catch(e){warnings.push((e as Error).message);console.error(JSON.stringify({component:'chat',event:'models_read_failed',provider:p.id,error:String(e)}));}
+  if(p.available && p.inspections?.some(item=>item.query==='models' && item.scope==='provider' && item.version===1)){
+   try{
+    for(let attempt=0;attempt<2;attempt++){
+     let cursor:string|null=null;
+     const visited=new Set<string>();
+     const models:ProviderConfig['models']=[];
+     let defaultModel:string|null=null;
+     try{
+      do{
+       const page=readModelsPage(await call('agent.inspect',{providerId:p.id,query:'models',version:1,args:cursor ? {cursor} : {}}));
+       defaultModel=page.defaultModel;
+       models.push(...page.models);
+       cursor=page.nextCursor;
+       if(cursor && visited.has(cursor)) throw Error('模型目录分页游标重复');
+       if(cursor) visited.add(cursor);
+      }while(cursor && visited.size<50);
+     }catch(error){
+      if(attempt===0 && cursor && error instanceof ModelError && error.code==='conflict') continue;
+      throw error;
+     }
+     cfg.models=models;
+     cfg.defaultModel=defaultModel;
+     if(cursor) warnings.push('模型目录仅显示前 50 页');
+     break;
+    }
+   }catch(e){warnings.push((e as Error).message);console.error(JSON.stringify({component:'chat',event:'models_read_failed',provider:p.id,error:String(e)}));}
   }
   })()]);cfg.warning=warnings.filter(Boolean).join('；');
  }));

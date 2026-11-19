@@ -1,10 +1,12 @@
 export type ToolTarget = string | { moduleId: string; tool: string };
 export type ProviderList = { items: {
   id: string; name: string; moduleId: string; configuration?: { tool: string };
+  inspections?: { query: string; scope: "provider" | "run"; version: number }[];
   available: boolean; capabilities: { conversation: boolean };
 }[] };
 export type ProviderConfig = {
-  models: { value: string; label: string }[]; thinking: string[]; warning: string; view?: unknown;
+  models: { value: string; label: string; effort: { options: string[]; default: string | null } | null }[];
+  defaultModel: string | null; warning: string; view?: unknown;
 };
 export type Tool = {
   target: ToolTarget; module: string; name: string; label?: string; description: string;

@@ -12,6 +12,7 @@
   "effects": [],
   "uses": [
     "agent.providers",
+    "agent.inspect",
     "agent.run",
     "agent.read",
     "agent.write",

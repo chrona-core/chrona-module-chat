@@ -92,6 +92,15 @@ async page => {
     await effort.click();
     assert(await page.getByRole('menuitemradio', {name:'高', exact:true}).getAttribute('aria-checked') === 'true', 'Effort must display the saved choice');
     await page.keyboard.press('Escape');
+    await button('选择模型').click();
+    await picker.getByRole('option', {name:'快速模型'}).click();
+    await picker.waitFor({state:'hidden'});
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '选择模型');
+    await effort.click();
+    await page.getByRole('menuitemradio', {name:'关闭', exact:true}).waitFor();
+    assert(await highEffort.count() === 0, 'effort choices must follow the selected model');
+    assert(await page.getByRole('menuitemradio', {name:'继承提供方设置', checked:true}).count() === 1, 'unsupported effort must reset');
+    await page.keyboard.press('Escape');
     const toolsButton = page.getByRole('button', {name:/应用工具（已选/});
     const layout = () => page.evaluate(() => ['body > header', '.chat-sidebar', '.chat-main'].map(selector => {
       const {x, width} = document.querySelector(selector).getBoundingClientRect();

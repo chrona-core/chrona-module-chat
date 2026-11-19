@@ -211,9 +211,18 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
     void task(() => execute({ id, key: crypto.randomUUID(), kind, input, text: submitted }));
   }
 
+  function effortFor(settings: Conversation['settings']) {
+    const config = catalog?.configs[settings.providerId];
+    return config?.models.find(model => model.value === (settings.model || config.defaultModel))?.effort;
+  }
+
   function sendMessage(target: Conversation, value: string) {
+    const modelEffort = effortFor(target.settings);
+    const settings = modelEffort && !modelEffort.options.includes(target.settings.thinking)
+      ? {...target.settings, thinking: ''}
+      : target.settings;
     return execute({ id: target.id, key: crypto.randomUUID(), kind: 'send', text: value, input: {
-      snapshot: { draft: value, revision: target.revision, attachmentIds: target.attachments.map(a => a.id), settings: target.settings },
+      snapshot: { draft: value, revision: target.revision, attachmentIds: target.attachments.map(a => a.id), settings },
     } });
   }
 
@@ -252,8 +261,10 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
   const provider = available.find(p => p.id === conversation?.settings.providerId);
   const contextProvider = conversation?.context?.providerId;
   const pickerProviders = contextProvider ? available.filter(p => p.id === contextProvider) : available;
-  const effortLevels = provider ? catalog?.configs[provider.id]?.thinking ?? [] : [];
-  const effort = conversation?.settings.thinking ?? '';
+  const modelEffort = conversation && effortFor(conversation.settings);
+  const effortLevels = modelEffort?.options ?? [];
+  const savedEffort = conversation?.settings.thinking ?? '';
+  const effort = effortLevels.includes(savedEffort) ? savedEffort : '';
   const effortLabels: Record<string, string> = {off:t('关闭'), minimal:t('最低'), low:t('低'), medium:t('中'), high:t('高'), xhigh:t('很高'), max:t('最高')};
   const settingsLocked = busy || !!active || !!pending || !!currentRequest || (!id && (!ready || !catalog || retryCreate));
   function saveSettings(patch: Partial<Conversation['settings']>, close?: () => void) {
@@ -400,10 +411,10 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
                     {pickerProviders.map(candidate => {
                       const config = catalog?.configs[candidate.id];
                       const sameProvider = candidate.id === conversation?.settings.providerId;
-                      const models = [{value:'', label:t('继承提供方设置')}, ...(config?.models ?? []).filter(model => model.value)];
+                      const models = [{value:'', label:t('继承提供方设置'), effort:config?.models.find(model => model.value === config.defaultModel)?.effort}, ...(config?.models ?? []).filter(model => model.value)];
                       return <CommandGroup key={candidate.id} heading={candidate.name} className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:gap-1">
                         {models.map(model => <CommandItem key={model.value} className="min-h-11 cursor-pointer border border-transparent px-3 data-[selected=true]:border-input" value={JSON.stringify([candidate.id, model.value])} keywords={[candidate.name, model.label]} disabled={settingsLocked} data-checked={sameProvider && model.value === conversation?.settings.model} onSelect={() => void saveSettings({
-                          providerId: candidate.id, model: model.value, thinking: sameProvider ? effort : '',
+                          providerId: candidate.id, model: model.value, thinking: sameProvider && model.effort?.options.includes(savedEffort) ? savedEffort : '',
                         }, () => setModelOpen(false))}>
                           <span className="min-w-0 flex-1 truncate">{model.label}</span>
                         </CommandItem>)}
@@ -417,7 +428,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
               </DialogContent>
             </Dialog>
             {!!effortLevels.length && <DropdownMenu modal={false}>
-              <DropdownMenuTrigger render={<InputGroupButton type="button" variant="ghost" size="sm" aria-label={t("思考强度")} className="chat-effort" disabled={settingsLocked} />}><Brain /><span>{effort ? effortLabels[effort] ?? effort : t('默认')}</span><ChevronDown /></DropdownMenuTrigger>
+              <DropdownMenuTrigger render={<InputGroupButton type="button" variant="ghost" size="sm" aria-label={t("思考强度")} className="chat-effort" disabled={settingsLocked} />}><Brain /><span>{effort ? effortLabels[effort] ?? effort : modelEffort?.default ? effortLabels[modelEffort.default] ?? modelEffort.default : t('默认')}</span><ChevronDown /></DropdownMenuTrigger>
               <DropdownMenuContent container={container} side="top" align="start" aria-label={t("思考强度")}>
                 <DropdownMenuRadioGroup value={effort} onValueChange={thinking => void saveSettings({thinking})}>
                   <DropdownMenuRadioItem closeOnClick value="">{t("继承提供方设置")}</DropdownMenuRadioItem>
