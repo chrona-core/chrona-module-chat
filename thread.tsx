@@ -35,6 +35,23 @@ const markdownProps = {
   skipHtml: true,
 };
 
+function summarizeToolArgs(raw?: string) {
+  if (!raw) return '';
+  let args: unknown;
+  try { args = JSON.parse(raw); }
+  catch { return /^[\s]*[\[{]/.test(raw) ? '' : raw; }
+  if (typeof args === 'string') return args;
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return '';
+  const fields = Object.entries(args);
+  for (const key of ['command', 'path', 'file_path', 'filePath', 'query', 'url', 'pattern']) {
+    const value = fields.find(([name]) => name === key)?.[1];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return fields.flatMap(([key, value]) =>
+    typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? [`${key}=${value}`] : [],
+  ).slice(0, 3).join(' · ');
+}
+
 function RunContent({ run, fallback }: {run: Run; fallback?: string}) {
   const t = useTranslation();
   const transcript = run.transcript ?? [];
@@ -75,25 +92,20 @@ function RunContent({ run, fallback }: {run: Run; fallback?: string}) {
       {block.steps.map(({call, result}, i) => {
         const key = call?.callId ?? result?.callId ?? i;
         const toolName = call?.tool || result?.tool || t('工具执行');
+        const summary = summarizeToolArgs(call?.args).replace(/\r\n?|\n/g, ' ↵ ').trim();
         const hasError = result?.error || (!result && run.ended);
+        const output = result?.text || (hasError ? t('未收到工具结果') : result ? t('无输出') : undefined);
         const line = <TraceLine status={hasError ? 'error' : !result ? 'running' : undefined}>
           <TraceIcon><Terminal /></TraceIcon>
-          <TraceTitle>{toolName}</TraceTitle>
+          <TraceTitle title={summary || undefined}><strong className="font-medium">{toolName}</strong>{summary && <> <code>{summary}</code></>}</TraceTitle>
         </TraceLine>;
-        const details = [
-          { label: t('参数'), text: call?.args },
-          { label: hasError ? t('错误') : t('结果'), text: result?.text || (hasError ? t('未收到工具结果') : result ? t('无输出') : undefined) },
-        ].filter((section): section is { label: string; text: string } => section.text !== undefined);
-        return details.length ? <TraceCollapsible key={key}>
+        return output !== undefined ? <TraceCollapsible key={key}>
           <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
-          <TraceCollapsibleContent className="flex flex-col gap-3">
-            {details.map(({label, text}) => <section key={label}>
-              <h4 className="mb-1 text-xs font-medium">{label}</h4>
-              <CodeBlock size="sm">
-                <CodeBlockHeader><CodeBlockActions><CodeBlockCopyButton value={text} /></CodeBlockActions></CodeBlockHeader>
-                <CodeBlockContent wrap className="max-h-64">{text}</CodeBlockContent>
-              </CodeBlock>
-            </section>)}
+          <TraceCollapsibleContent>
+            <CodeBlock size="sm">
+              <CodeBlockActions><CodeBlockCopyButton value={output} /></CodeBlockActions>
+              <CodeBlockContent wrap className="max-h-64 pe-10">{output}</CodeBlockContent>
+            </CodeBlock>
           </TraceCollapsibleContent>
         </TraceCollapsible> : <div key={key}>{line}</div>;
       })}

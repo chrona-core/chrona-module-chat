@@ -78,11 +78,11 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "023226cbb2588dcd30aa7aebcdd54f94864ab02e36c972f515d5e2f0da957a8a"
+      "sha256": "867c9fe9ceb6cff12861c07eea4af0efe7f3682a24f8df0d87984511ec73de22"
     },
     {
       "path": "dist/ui.css",
-      "sha256": "69267e4071cb79287ff38946f09889af0103e102afb54b350424fb21455a65e0"
+      "sha256": "12f0970e68bed40ed4802f2512f35a87bae8aa0b5bb5d8cd6ce4911828e242e1"
     }
   ],
   "build": {

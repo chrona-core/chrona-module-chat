@@ -43,7 +43,14 @@ function send(row,args) {
   row.operations.push({key:args.key,kind:args.kind,status:'succeeded'});
   return row;
 }
-const toolTrace=[{kind:'tool',tool:'read',callId:'a',args:'first.txt'},{kind:'tool',tool:'read',callId:'b',args:'second.txt'},{kind:'result',tool:'read',callId:'b',text:'second result'},{kind:'result',tool:'read',callId:'a',text:'first result'}];
+const toolTrace=[
+  {kind:'tool',tool:'read',callId:'a',args:JSON.stringify({path:'first.txt',offset:2})},
+  {kind:'tool',tool:'read',callId:'b',args:'second.txt'},
+  {kind:'result',tool:'read',callId:'b',text:'second result'},
+  {kind:'result',tool:'read',callId:'a',text:'first result'},
+  {kind:'tool',tool:'bash',callId:'c',args:JSON.stringify({command:'git status --short',timeout:70})},
+  {kind:'result',tool:'bash',callId:'c',text:'command failed',error:true},
+];
 let streamStep=0;
 window.advanceFixtureStream=()=>streamStep++;
 function stream(row) {
