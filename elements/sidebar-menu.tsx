@@ -1,6 +1,7 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { Slot } from "@radix-ui/react-slot"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import { cn } from "../cn"
 
 function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
@@ -48,30 +49,21 @@ const sidebarMenuButtonVariants = cva(
 )
 
 function SidebarMenuButton({
-  asChild = false,
+  render,
   isActive = false,
   variant = "default",
   size = "default",
   className,
   ...props
-}: React.ComponentProps<"button"> & {
-  asChild?: boolean
+}: useRender.ComponentProps<"button"> & {
   isActive?: boolean
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const Comp = asChild ? Slot : "button"
-
-  const button = (
-    <Comp
-      data-slot="sidebar-menu-button"
-      data-sidebar="menu-button"
-      data-size={size}
-      data-active={isActive}
-      className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-      {...props}
-    />
-  )
-
-  return button
+  return useRender({
+    defaultTagName: "button",
+    props: mergeProps<"button">({ className: cn(sidebarMenuButtonVariants({ variant, size }), className) }, props),
+    render,
+    state: { slot: "sidebar-menu-button", sidebar: "menu-button", size, active: isActive },
+  })
 }
 
 export { SidebarMenu, SidebarMenuItem, SidebarMenuButton }

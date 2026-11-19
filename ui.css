@@ -77,6 +77,8 @@ button, textarea, input, select { font: inherit; }
 button:disabled { cursor: default; }
 button:not(:disabled), summary { cursor: pointer; }
 :focus-visible:not([data-slot=command-input], [data-slot=checkbox], .chat-prompt textarea) { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+/* Web sets its own focus outline. The command input group already draws a rounded ring. */
+[data-slot=command-input]:focus-visible { outline: none !important; }
 /* The shell assigns a minimum height to buttons, including Radix checkbox buttons. */
 button[data-slot=checkbox] { min-block-size: 0; }
 button[data-slot=checkbox]:focus-visible, .chat-prompt textarea:focus-visible { outline: none; }

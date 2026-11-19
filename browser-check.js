@@ -74,6 +74,7 @@ async page => {
     await button('选择模型').click();
     await search.waitFor();
     await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '搜索模型');
+    await page.addStyleTag({content:'body > main#main :where(input):focus-visible { outline: 2px solid salmon; outline-offset: 3px; }'});
     assert(await search.evaluate(el => {
       const inputGroup = el.closest('[data-slot=input-group]');
       return getComputedStyle(el).outlineStyle === 'none' &&
@@ -129,7 +130,7 @@ async page => {
   await page.evaluate(() => window.advanceFixtureStream());
   await page.getByText('最终正文', {exact:true}).waitFor();
   assert(await page.getByText('正在生成第一段', {exact:true}).count() === 0, 'final text replaces the partial reply');
-  const reads = page.getByRole('button', {name:'read 已完成', exact:true});
+  const reads = page.getByRole('button', {name:'read', exact:true});
   const firstRead = reads.nth(0);
   const secondRead = reads.nth(1);
   await secondRead.waitFor();
@@ -237,7 +238,7 @@ async page => {
   await open('sidebar-actions');
   let rowActions = (await list()).getByRole('button', {name:'操作：另一段会话', exact:true});
   await rowActions.press('Enter');
-  const rowMenu = page.getByRole('menu', {name:'操作：另一段会话'});
+  const rowMenu = page.getByRole('menu', {name:'另一段会话的操作'});
   await rowMenu.getByRole('menuitem', {name:'置顶', exact:true}).click();
   await page.waitForFunction(() => window.fixtureCalls.some(call => call.name === 'edit' && call.args.id === 'second' && JSON.parse(call.args.patch).pinned === true));
   assert(new URL(page.url()).searchParams.get('conversation') === 'fixture', 'pinning another row must keep the open conversation');

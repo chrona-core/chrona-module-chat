@@ -68,6 +68,7 @@
   "正在读取模型目录…": "Loading model catalog…",
   "没有匹配的模型": "No matching models",
   "没有可用的执行提供方": "No execution providers available",
+  "提供方未返回可选模型": "The provider returned no selectable models",
   "继承提供方设置": "Use provider settings",
   "思考强度": "Thinking effort",
   "默认": "Default",

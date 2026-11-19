@@ -47,7 +47,7 @@ export function Tools({ conversation, catalog, busy, save }: {conversation: Conv
           const additions = entries.filter(t => t.available !== false && !selected.has(targetKey(t.target)));
           const count = entries.filter(t => selected.has(targetKey(t.target))).length;
           return <Collapsible key={`${app}:${!!query.trim()}`} defaultOpen={!!query.trim()}>
-            <CollapsibleTrigger asChild><Button type="button" variant="ghost" className="w-full justify-between"><span className="truncate">{app}</span><span className="ml-auto text-muted-foreground">{count}/{entries.length}</span><ChevronDown data-icon="inline-end" /></Button></CollapsibleTrigger>
+            <CollapsibleTrigger render={<Button type="button" variant="ghost" className="w-full justify-between" />}><span className="truncate">{app}</span><span className="ml-auto text-muted-foreground">{count}/{entries.length}</span><ChevronDown data-icon="inline-end" /></CollapsibleTrigger>
             <CollapsibleContent className="px-2 py-2">
               <FieldSet className="gap-3">
                 <FieldLegend className="sr-only">{t('{0} 的工具', app)}</FieldLegend>
@@ -116,7 +116,7 @@ export function Delivery({conversation, busy, refresh}: {conversation: Conversat
       {!!item.members?.length && <CardContent>{item.members.map(member => <p key={member.moduleId}>{member.name ?? member.moduleId} · {member.activation}</p>)}</CardContent>}
       <CardFooter className="flex-wrap gap-2">
         {item.approvalId && <a href={`/today?approval=${encodeURIComponent(item.approvalId)}`}>{t("打开审批")}</a>}
-        <Collapsible><CollapsibleTrigger asChild><Button variant="link" size="sm">{t("查看回执编号")}</Button></CollapsibleTrigger><CollapsibleContent><code className="wrap-anywhere">{item.receiptId}</code></CollapsibleContent></Collapsible>
+        <Collapsible><CollapsibleTrigger render={<Button variant="link" size="sm" />}>{t("查看回执编号")}</CollapsibleTrigger><CollapsibleContent><code className="wrap-anywhere">{item.receiptId}</code></CollapsibleContent></Collapsible>
       </CardFooter>
     </Card>)}
     <div className="flex justify-end"><Button variant="outline" disabled={busy} onClick={() => void refresh()}>{t("核对交付回执")}</Button></div>

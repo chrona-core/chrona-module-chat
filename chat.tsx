@@ -4,7 +4,7 @@ import { ChatLocale, type Locale, useTranslation } from './locale';
 import { ArrowUp, Brain, ChevronDown, Ellipsis, Menu, Paperclip, Plus, Search, Settings2, Square, X } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './elements/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './elements/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './elements/alert-dialog';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from './elements/sheet';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from './elements/sidebar-menu';
@@ -14,7 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './elements/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './elements/tabs';
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentGroup, AttachmentTitle } from './elements/attachment';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from './elements/input-group';
-import { ModelSelector, ModelSelectorContent, ModelSelectorEmpty, ModelSelectorGroup, ModelSelectorInput, ModelSelectorItem, ModelSelectorList, ModelSelectorName, ModelSelectorTrigger } from './elements/model-selector';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './elements/command';
 import { Card, CardContent, CardHeader, CardTitle } from './elements/card';
 import { Field, FieldGroup, FieldLabel } from './elements/field';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem } from './elements/dropdown-menu';
@@ -328,16 +328,16 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
                   {row.pinned && <span aria-label={t("已置顶")}>↟</span>}<span className="truncate">{row.title}</span>
                 </SidebarMenuButton>
                 <DropdownMenu modal={false}>
-                  <DropdownMenuTrigger asChild><Button type="button" size="icon-sm" variant="ghost" aria-label={t('操作：{0}', row.title)}><Ellipsis /></Button></DropdownMenuTrigger>
+                  <DropdownMenuTrigger render={<Button type="button" size="icon-sm" variant="ghost" aria-label={t('操作：{0}', row.title)} />}><Ellipsis /></DropdownMenuTrigger>
                   <DropdownMenuContent container={drawer ? drawerContainer ?? container : container} align="end" aria-label={t('{0}的操作', row.title)}>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'rename')}>{t("重命名")}</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'pinned')}>{row.pinned ? t('取消置顶') : t('置顶')}</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'archived')}>{row.archived ? t('取消归档') : t('归档')}</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'run')}>{t("执行记录")}</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'delivery')}>{t("应用交付")}</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'scope')}>{t("Mind 学习范围")}</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} onSelect={() => openConversationPanel(row, 'manage', 'new-context')}>{t("重置执行上下文")}</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} variant="destructive" onSelect={() => openConversationPanel(row, 'manage', 'delete')}>{t("删除对话")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openConversationPanel(row, 'rename')}>{t("重命名")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onClick={() => void toggleConversation(row, 'pinned')}>{row.pinned ? t('取消置顶') : t('置顶')}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onClick={() => void toggleConversation(row, 'archived')}>{row.archived ? t('取消归档') : t('归档')}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openConversationPanel(row, 'run')}>{t("执行记录")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openConversationPanel(row, 'delivery')}>{t("应用交付")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openConversationPanel(row, 'scope')}>{t("Mind 学习范围")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onClick={() => openConversationPanel(row, 'manage', 'new-context')}>{t("重置执行上下文")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} variant="destructive" onClick={() => openConversationPanel(row, 'manage', 'delete')}>{t("删除对话")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>)}</SidebarMenu>
@@ -385,39 +385,43 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
           <InputGroupAddon align="block-end" className="gap-1 border-t border-input bg-muted px-2 py-2">
             <Input ref={fileInput} type="file" hidden multiple accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => {if (e.currentTarget.files) upload(e.currentTarget.files); e.currentTarget.value = '';}} />
             <InputGroupButton type="button" variant="outline" size="icon-sm" className="rounded-full" aria-label={t("添加图片")} disabled={settingsLocked} onClick={() => fileInput.current?.click()}><Plus /></InputGroupButton>
-            <ModelSelector open={modelOpen} onOpenChange={setModelOpen} modal="trap-focus">
-              <ModelSelectorTrigger render={<InputGroupButton ref={modelTrigger} type="button" variant="ghost" size="sm" className="min-w-0 max-w-[min(38vw,350px)] shrink" aria-label={t("选择模型")} disabled={settingsLocked} />}>
+            <Dialog open={modelOpen} onOpenChange={setModelOpen} modal="trap-focus">
+              <DialogTrigger render={<InputGroupButton ref={modelTrigger} type="button" variant="ghost" size="sm" className="min-w-0 max-w-[min(38vw,350px)] shrink" aria-label={t("选择模型")} disabled={settingsLocked} />}>
                 <span className="truncate">{conversation?.settings.model || provider?.name || t('选择模型')}</span><ChevronDown />
-              </ModelSelectorTrigger>
-              <ModelSelectorContent container={container} initialFocus={modelSearch} finalFocus={modelTrigger}>
-                <ModelSelectorInput ref={modelSearch} aria-label={t("搜索模型")} placeholder={t("搜索模型")} onKeyDown={event => {
-                  if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.stopPropagation();
-                }} />
-                <ModelSelectorList className="max-h-[min(50dvh,320px)]">
-                  <ModelSelectorEmpty>{!catalog ? t('正在读取模型目录…') : pickerProviders.length ? t('没有匹配的模型') : t('没有可用的执行提供方')}</ModelSelectorEmpty>
-                  {pickerProviders.map(candidate => {
-                    const config = catalog?.configs[candidate.id];
-                    const sameProvider = candidate.id === conversation?.settings.providerId;
-                    const models = [{value:'', label:t('继承提供方设置')}, ...(config?.models ?? []).filter(model => model.value)];
-                    return <ModelSelectorGroup key={candidate.id} heading={candidate.name} className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:gap-1">
-                      {models.map(model => <ModelSelectorItem key={model.value} className="min-h-11 cursor-pointer border border-transparent px-3 data-[selected=true]:border-input" value={JSON.stringify([candidate.id, model.value])} keywords={[candidate.name, model.label]} disabled={settingsLocked} data-checked={sameProvider && model.value === conversation?.settings.model} onSelect={() => void saveSettings({
-                        providerId: candidate.id, model: model.value, thinking: sameProvider ? effort : '',
-                      }, () => setModelOpen(false))}>
-                        <ModelSelectorName>{model.label}</ModelSelectorName>
-                      </ModelSelectorItem>)}
-                      {config?.warning && <p className="px-2 py-1 text-xs text-muted-foreground wrap-anywhere">{config.warning}</p>}
-                    </ModelSelectorGroup>;
-                  })}
-                </ModelSelectorList>
-                {error && <p role="alert" className="px-3 pb-2 text-sm text-destructive">{error}</p>}
-              </ModelSelectorContent>
-            </ModelSelector>
+              </DialogTrigger>
+              <DialogContent container={container} initialFocus={modelSearch} finalFocus={modelTrigger} showCloseButton={false} aria-describedby={undefined} className="p-0">
+                <DialogTitle className="sr-only">{t('模型选择')}</DialogTitle>
+                <Command className="**:data-[slot=command-input-wrapper]:h-auto">
+                  <CommandInput ref={modelSearch} aria-label={t("搜索模型")} placeholder={t("搜索模型")} onKeyDown={event => {
+                    if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.stopPropagation();
+                  }} />
+                  <CommandList className="max-h-[min(50dvh,320px)]">
+                    <CommandEmpty>{!catalog ? t('正在读取模型目录…') : pickerProviders.length ? t('没有匹配的模型') : t('没有可用的执行提供方')}</CommandEmpty>
+                    {pickerProviders.map(candidate => {
+                      const config = catalog?.configs[candidate.id];
+                      const sameProvider = candidate.id === conversation?.settings.providerId;
+                      const models = [{value:'', label:t('继承提供方设置')}, ...(config?.models ?? []).filter(model => model.value)];
+                      return <CommandGroup key={candidate.id} heading={candidate.name} className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:gap-1">
+                        {models.map(model => <CommandItem key={model.value} className="min-h-11 cursor-pointer border border-transparent px-3 data-[selected=true]:border-input" value={JSON.stringify([candidate.id, model.value])} keywords={[candidate.name, model.label]} disabled={settingsLocked} data-checked={sameProvider && model.value === conversation?.settings.model} onSelect={() => void saveSettings({
+                          providerId: candidate.id, model: model.value, thinking: sameProvider ? effort : '',
+                        }, () => setModelOpen(false))}>
+                          <span className="min-w-0 flex-1 truncate">{model.label}</span>
+                        </CommandItem>)}
+                        {config && models.length === 1 && <p className="px-2 py-1 text-xs text-muted-foreground">{t('提供方未返回可选模型')}</p>}
+                        {config?.warning && <p className="px-2 py-1 text-xs text-muted-foreground wrap-anywhere">{config.warning}</p>}
+                      </CommandGroup>;
+                    })}
+                  </CommandList>
+                  {error && <p role="alert" className="px-3 pb-2 text-sm text-destructive">{error}</p>}
+                </Command>
+              </DialogContent>
+            </Dialog>
             {!!effortLevels.length && <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild><InputGroupButton type="button" variant="ghost" size="sm" aria-label={t("思考强度")} className="chat-effort" disabled={settingsLocked}><Brain /><span>{effort ? effortLabels[effort] ?? effort : t('默认')}</span><ChevronDown /></InputGroupButton></DropdownMenuTrigger>
+              <DropdownMenuTrigger render={<InputGroupButton type="button" variant="ghost" size="sm" aria-label={t("思考强度")} className="chat-effort" disabled={settingsLocked} />}><Brain /><span>{effort ? effortLabels[effort] ?? effort : t('默认')}</span><ChevronDown /></DropdownMenuTrigger>
               <DropdownMenuContent container={container} side="top" align="start" aria-label={t("思考强度")}>
                 <DropdownMenuRadioGroup value={effort} onValueChange={thinking => void saveSettings({thinking})}>
-                  <DropdownMenuRadioItem value="">{t("继承提供方设置")}</DropdownMenuRadioItem>
-                  {effortLevels.filter(Boolean).map(level => <DropdownMenuRadioItem key={level} value={level}>{effortLabels[level] ?? level}</DropdownMenuRadioItem>)}
+                  <DropdownMenuRadioItem closeOnClick value="">{t("继承提供方设置")}</DropdownMenuRadioItem>
+                  {effortLevels.filter(Boolean).map(level => <DropdownMenuRadioItem closeOnClick key={level} value={level}>{effortLabels[level] ?? level}</DropdownMenuRadioItem>)}
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>}
@@ -435,7 +439,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
       <DialogContent container={container} className="max-h-[86dvh] overflow-auto overscroll-contain sm:max-w-xl">
         <DialogHeader><DialogTitle>{title[panel]}</DialogTitle></DialogHeader>
         {panel === 'tools' && conversation && catalog && <Tools key={id} conversation={conversation} catalog={catalog} busy={settingsLocked} save={settings => saveSettings(settings, () => setPanel(null))} />}
-        {panel === 'run' && conversation && <div className="grid gap-3">{active && <p>{t("当前执行 ·")} {active.observedStatus || t('正在启动')}{active.runId && <><br /><code>{active.runId}</code></>}</p>}{!conversation.operations.length && <p>{t("还没有执行记录")}</p>}{[...conversation.operations].reverse().map(op => <Card size="sm" key={op.key}><CardHeader><CardTitle>{{send:t('发送'), message:t('补充'), stop:t('停止'), answer:t('回答')}[op.kind] ?? op.kind} · {{succeeded:t('已受理'), rejected:t('已拒绝'), failed:t('失败')}[op.status] ?? t('待确认')}</CardTitle></CardHeader><CardContent>{(op.error || op.recoveryNotice) && <p>{op.recoveryNotice || op.error}</p>}<Collapsible><CollapsibleTrigger asChild><Button variant="link" size="sm">{t("请求编号")}</Button></CollapsibleTrigger><CollapsibleContent><code>{op.key}</code></CollapsibleContent></Collapsible></CardContent></Card>)}</div>}
+        {panel === 'run' && conversation && <div className="grid gap-3">{active && <p>{t("当前执行 ·")} {active.observedStatus || t('正在启动')}{active.runId && <><br /><code>{active.runId}</code></>}</p>}{!conversation.operations.length && <p>{t("还没有执行记录")}</p>}{[...conversation.operations].reverse().map(op => <Card size="sm" key={op.key}><CardHeader><CardTitle>{{send:t('发送'), message:t('补充'), stop:t('停止'), answer:t('回答')}[op.kind] ?? op.kind} · {{succeeded:t('已受理'), rejected:t('已拒绝'), failed:t('失败')}[op.status] ?? t('待确认')}</CardTitle></CardHeader><CardContent>{(op.error || op.recoveryNotice) && <p>{op.recoveryNotice || op.error}</p>}<Collapsible><CollapsibleTrigger render={<Button variant="link" size="sm" />}>{t("请求编号")}</CollapsibleTrigger><CollapsibleContent><code>{op.key}</code></CollapsibleContent></Collapsible></CardContent></Card>)}</div>}
         {panel === 'scope' && <Scope api={api} id={id} run={task} busy={busy} />}
         {panel === 'delivery' && conversation && <Delivery conversation={conversation} busy={busy} refresh={() => task(async () => update(await api('delivery', {id})))} />}
         {panel === 'image' && image && <img className="chat-image" src={image.src} alt={image.name} />}

@@ -34,7 +34,6 @@
     "elements/label.tsx",
     "elements/message-scroller.tsx",
     "elements/message.tsx",
-    "elements/model-selector.tsx",
     "elements/native-select.tsx",
     "elements/popover.tsx",
     "elements/questionnaire.tsx",
@@ -42,7 +41,6 @@
     "elements/sheet.tsx",
     "elements/sidebar-menu.tsx",
     "elements/tabs.tsx",
-    "elements/tool.tsx",
     "elements/trace.tsx",
     "frontend-context.ts",
     "host-agent.integration.test.ts",
@@ -80,11 +78,11 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "8137dcf29f505f3366980b838c6f7cad160c6ab8ee4760790bfd7f6063f0bb5a"
+      "sha256": "023226cbb2588dcd30aa7aebcdd54f94864ab02e36c972f515d5e2f0da957a8a"
     },
     {
       "path": "dist/ui.css",
-      "sha256": "07911476c556c93dc521b9691db8584f0c39da289bef2195e3bf9344257b9712"
+      "sha256": "69267e4071cb79287ff38946f09889af0103e102afb54b350424fb21455a65e0"
     }
   ],
   "build": {

@@ -2,11 +2,11 @@ import * as React from "react"
 import { cn } from "../cn"
 
 import {
-  Root as Collapsible,
-  Content as CollapsibleContent,
-  Trigger as CollapsibleTrigger,
-} from "@radix-ui/react-collapsible"
-import { ChevronRight } from "lucide-react"
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./collapsible"
+import { ChevronRightIcon } from "lucide-react"
 
 function Trace({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -84,7 +84,7 @@ function TraceDescription({
 function TraceCollapsible({
   className,
   ...props
-}: Omit<React.ComponentProps<typeof Collapsible>, "asChild" | "open"> &
+}: Omit<React.ComponentProps<typeof Collapsible>, "open"> &
   (
     | { open?: undefined }
     | {
@@ -107,7 +107,7 @@ function TraceCollapsibleTrigger({
   className,
   children,
   ...props
-}: Omit<React.ComponentProps<typeof CollapsibleTrigger>, "asChild">) {
+}: React.ComponentProps<typeof CollapsibleTrigger>) {
   return (
     <CollapsibleTrigger
       data-slot="trace-collapsible-trigger"
@@ -119,7 +119,7 @@ function TraceCollapsibleTrigger({
     >
       {children}
       <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
-        <ChevronRight />
+        <ChevronRightIcon />
       </TraceIcon>
     </CollapsibleTrigger>
   )
@@ -129,11 +129,11 @@ function TraceCollapsibleContent({
   className,
   children,
   ...props
-}: Omit<React.ComponentProps<typeof CollapsibleContent>, "asChild">) {
+}: React.ComponentProps<typeof CollapsibleContent>) {
   return (
     <CollapsibleContent
       data-slot="trace-collapsible-content"
-      className="min-w-0 overflow-hidden duration-200 [--radix-accordion-content-height:var(--radix-collapsible-content-height)] data-open:animate-accordion-down data-closed:animate-accordion-up"
+      className="h-(--collapsible-panel-height) min-w-0 overflow-hidden transition-[height] duration-200 data-ending-style:h-0 data-starting-style:h-0"
       {...props}
     >
       <div

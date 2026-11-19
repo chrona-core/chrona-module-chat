@@ -1,6 +1,6 @@
 import { isValidElement, type ReactNode } from 'react';
 import { useTranslation } from './locale';
-import { Paperclip } from 'lucide-react';
+import { Paperclip, Terminal } from 'lucide-react';
 import { defaultRehypePlugins, Streamdown, type Components } from 'streamdown';
 import { Button } from './button';
 import { Input } from './input';
@@ -9,7 +9,7 @@ import { Textarea } from './textarea';
 import { Message, MessageContent, MessageFooter } from './elements/message';
 import { Bubble, BubbleContent } from './elements/bubble';
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from './elements/message-scroller';
-import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from './elements/tool';
+import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from './elements/trace';
 import { Attachment as FileAttachment, AttachmentTitle } from './elements/attachment';
 import type { Attachment, Conversation, Run } from './view-types';
 
@@ -71,20 +71,33 @@ function RunContent({ run, fallback }: {run: Run; fallback?: string}) {
     steps.push(step);
   }
   return <>
-    {blocks.map((block, index) => block.kind === 'text' ? <Streamdown key={index} {...markdownProps}>{block.text}</Streamdown> : <div key={index} className="flex min-w-0 flex-col gap-2">
+    {blocks.map((block, index) => block.kind === 'text' ? <Streamdown key={index} {...markdownProps}>{block.text}</Streamdown> : <Trace key={index}>
       {block.steps.map(({call, result}, i) => {
+        const key = call?.callId ?? result?.callId ?? i;
         const toolName = call?.tool || result?.tool || t('工具执行');
-        const state = result ? (result.error ? 'output-error' : 'output-available') : run.ended ? 'output-error' : 'input-available';
-        const errorText = state === 'output-error' ? result?.text || t('未收到工具结果') : undefined;
-        return <Tool key={call?.callId ?? result?.callId ?? i}>
-          <ToolHeader type="dynamic-tool" toolName={toolName} state={state} />
-          <ToolContent>
-            {call?.args && <ToolInput input={call.args} />}
-            <ToolOutput output={result && !result.error ? result.text || t('无输出') : undefined} errorText={errorText} />
-          </ToolContent>
-        </Tool>;
+        const hasError = result?.error || (!result && run.ended);
+        const line = <TraceLine status={hasError ? 'error' : !result ? 'running' : undefined}>
+          <TraceIcon><Terminal /></TraceIcon>
+          <TraceTitle>{toolName}</TraceTitle>
+        </TraceLine>;
+        const details = [
+          { label: t('参数'), text: call?.args },
+          { label: hasError ? t('错误') : t('结果'), text: result?.text || (hasError ? t('未收到工具结果') : result ? t('无输出') : undefined) },
+        ].filter((section): section is { label: string; text: string } => section.text !== undefined);
+        return details.length ? <TraceCollapsible key={key}>
+          <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+          <TraceCollapsibleContent className="flex flex-col gap-3">
+            {details.map(({label, text}) => <section key={label}>
+              <h4 className="mb-1 text-xs font-medium">{label}</h4>
+              <CodeBlock size="sm">
+                <CodeBlockHeader><CodeBlockActions><CodeBlockCopyButton value={text} /></CodeBlockActions></CodeBlockHeader>
+                <CodeBlockContent wrap className="max-h-64">{text}</CodeBlockContent>
+              </CodeBlock>
+            </section>)}
+          </TraceCollapsibleContent>
+        </TraceCollapsible> : <div key={key}>{line}</div>;
       })}
-    </div>)}
+    </Trace>)}
     {run.liveReply && <Streamdown {...markdownProps} mode="streaming" isAnimating>{run.liveReply}</Streamdown>}
     {!blocks.some(b => b.kind === 'text') && fallback && <Streamdown {...markdownProps}>{fallback}</Streamdown>}
     {run.error && <p className="chat-run-error">{run.error}</p>}
