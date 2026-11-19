@@ -256,3 +256,35 @@ test('transcript record identities retain identical operations and update only t
   expect(run.transcript.map((x: any) => x.id)).toEqual(['a', 'b', 'c']);
   expect(run.transcript[1].args).toBe('{"done":true}');
 });
+
+
+test('live text grows in the read response and leaves only the completed record in history', async () => {
+  await fixture(async ({ store, id, reads }) => {
+    for (const text of ['正在', '正在生成']) {
+      reads.push(async () => ({ ...readResult(), transcript: [{ id: 'r1', kind: 'text', at: '1', text, partial: true }] }));
+      expect((await store.reconcile(id, false)).active.liveReply).toBe(text);
+      expect(store.get(id).active.liveReply).toBeUndefined();
+      expect(store.get(id).active.transcript.some((item: {partial?: boolean}) => item.partial)).toBe(false);
+    }
+    const terminal = { ...readResult('r1', true), transcript: [{ id: 'final', kind: 'text', at: '1', text: '已经生成' }] };
+    reads.push(async () => terminal);
+    const final = await store.reconcile(id, false);
+    expect(final.active).toBeNull();
+    expect(final.messages.at(-1).run.transcript.at(-1)).toEqual(terminal.transcript[0]);
+    expect(final.messages.at(-1).run.liveReply).toBeUndefined();
+  });
+});
+
+
+test('a delayed partial cannot reappear after a newer read saves the reply with the same cursor', async () => {
+  await fixture(async ({ store, id, hold, reads }) => {
+    const older = hold(), pendingRead = store.reconcile(id, false);
+    await older.started;
+    const complete = { id: 'final', kind: 'text', at: '1', text: '完整回复' };
+    reads.push(async () => ({ ...readResult('r1', false, null), transcript: [complete] }));
+    expect((await store.reconcile(id, false)).active.transcript).toContainEqual(complete);
+    older.resolve({ ...readResult('r1', false, null), transcript: [{ id: 'r1', kind: 'text', at: '1', text: '旧正文', partial: true }] });
+    expect((await pendingRead).active.liveReply).toBeUndefined();
+    expect(store.get(id).active.transcript).toContainEqual(complete);
+  });
+});

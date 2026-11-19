@@ -5,16 +5,8 @@ import { join } from 'node:path';
 // @ts-expect-error Author supplies the SDK test harness.
 import { startModule } from 'chrona/testing';
 import { runStateChecks } from './state-checks';
-import { runDomChecks } from './dom-checks';
 import { runRegistrationChecks } from './registration-checks';
-import { runRaceChecks } from './race-checks';
-import { runSelectionChecks } from './selection-checks';
-import { runCreateChecks } from './create-checks';
 assert.equal(await runStateChecks(),15);
-assert.equal((await runDomChecks()).checks,11);
-assert.equal((await runRaceChecks()).checks,7);
-assert.equal((await runSelectionChecks()).checks,9);
-assert.equal((await runCreateChecks()).checks,6);
 assert.equal((await runRegistrationChecks()).page,'main');
 const directory=await mkdtemp(join(tmpdir(),'chat-sdk-v2-'));
 const oldData=process.env.CHRONA_DATA,oldContent=process.env.CHRONA_CONTENT;
@@ -52,7 +44,7 @@ try {
   c=await send('execute',{id:c.id,key:'sdk-stop',kind:'stop',input:'{}'});assert.equal(c.active,null);assert.equal(c.messages.at(-1).run.stopConfirmed,true);
   assert.equal(m.calls.some((x:{method: string})=>x.method==='callStatus'),false);
   const result=await m.send({trigger:{kind:'activated',id:'activated',firedAt:now},now,params:{}});assert.equal(result.error,undefined);
-  console.log(JSON.stringify({stateChecks:15,domChecks:11,raceChecks:7,selectionChecks:9,createChecks:6,registration:'passed',sdk:'passed'}));
+  console.log(JSON.stringify({stateChecks:15,registration:'passed',sdk:'passed'}));
 }finally{
   await m.stop();
   if(oldData===undefined)delete process.env.CHRONA_DATA;else process.env.CHRONA_DATA=oldData;

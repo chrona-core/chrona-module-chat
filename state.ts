@@ -39,6 +39,7 @@ export function mergeTranscript(run: TranscriptSnapshot, incoming: TranscriptRec
   }
 }
 export class Store {
+  private readonly reads = new Map<string, symbol>();
   db: Database;
   version = '';
   moduleId = '';
@@ -313,24 +314,32 @@ export class Store {
     let a = c.active;
     const runId = a.runId, key = a.key;
     let cursor = a.cursor ?? '';
+    let liveReply: string | undefined;
     if (this.version && c.context?.applicationHash !== this.version) {
       a.accessBlocked = true; a.error = '旧应用版本的 Run 不可访问，状态保持未知；消息记录已保留。'; return this.save(c);
     }
+    const read = Symbol();
+    this.reads.set(id, read);
     try {
       // Terminal is a Run state, not the end of the event cursor. Drain bounded pages.
       for (let page = 0; page < 5; page++) {
         cursor = a.cursor ?? '';
-        const r = await this.call('agent.read', { runId, cursor, limit: 100, waitMs: 0 });
+        const r = await this.call('agent.read', { runId, cursor, limit: 100, waitMs: 0, live: true });
         // Drafts and controls can change while the gateway is reading. Merge only
         // into the current actor; another reader may also have advanced its cursor.
         c = this.get(id);
         if (c.active?.runId !== runId || c.active.key !== key || (c.active.cursor ?? '') !== cursor) return c;
         a = c.active;
         if (r.run.runId !== runId) throw Error('执行身份不一致');
+        if (this.reads.get(id) !== read && r.transcript?.some((item: TranscriptRecord) => item.partial === true)) return c;
         const seen = new Set(a.seen);
         for (const item of r.items) if (!seen.has(item.sequence)) { seen.add(item.sequence); (a.events ??= []).push(item); }
         a.seen = [...seen]; if (r.nextCursor) a.cursor = r.nextCursor; a.interactions = r.interactions;
-        if (r.transcript) mergeTranscript(a, r.transcript);
+        if (r.transcript) {
+          const partial = r.transcript.find((item: TranscriptRecord) => item.partial === true);
+          if (!r.ended && typeof partial?.text === 'string') liveReply = partial.text;
+          mergeTranscript(a, r.transcript.filter((item: TranscriptRecord) => item.partial !== true));
+        }
         a.transcriptState = r.transcriptState ?? { status: r.transcript ? 'available' : 'pending', reason: '执行已结束，回复仍待读取。' };
         a.ended = r.ended; a.runActive = r.run.active; a.observedStatus = r.run.status; a.drained = r.ended && !r.nextCursor;
         a.status = a.stopRequested ? (a.stopConfirmed ? '已停止' : '停止未确认') : r.run.status;
@@ -350,8 +359,11 @@ export class Store {
       a = c.active;
       a.error = e.message;
       a.status = a.stopRequested ? (a.stopConfirmed ? '已停止' : '停止未确认') : '状态暂不可核对';
+    } finally {
+      if (this.reads.get(id) === read) this.reads.delete(id);
     }
-    return this.save(c);
+    const saved = this.save(c);
+    return saved.active && liveReply ? { ...saved, active: { ...saved.active, liveReply } } : saved;
   }
   newContext(id: string, confirmed: boolean) {
     const c = this.get(id);

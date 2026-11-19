@@ -10,10 +10,11 @@ if(scenario==='questions')c.active.interactions=[
   {id:'select',status:'pending',question:{title:'选择范围',message:'需要查看哪部分？',method:'select',options:['摘要','完整内容']}},
   {id:'editor',status:'pending',question:{title:'补充要求',message:'可编辑草稿',method:'editor',prefill:'保留这段草稿'}},
 ];
+if(scenario==='markdown')c.messages=[{id:'markdown',role:'assistant',text:['示例','',String.fromCharCode(96).repeat(3)+'sh','printf hello',String.fromCharCode(96).repeat(3)].join(String.fromCharCode(10))}];
 if(scenario==='error')c.operations=[{key:'rejected',kind:'send',status:'rejected',error:'提供方暂不可用。原始请求未受理，草稿已保留。',errors:[{code:'unavailable',message:'Provider unavailable'}]}];
-if(scenario==='tasks')c.messages=[{id:'original',role:'user',text:'原始请求：请整理研究资料，后续进展保留在这段对话。',attachments:[]}];
-const second={...structuredClone(c),id:'second',title:'另一段会话',messages:[{id:'other',role:'user',text:'第二段对话的唯一内容'}],active:null};
-const records=scenario.startsWith('first-message')?{}:{fixture:c,second};window.fixtureCalls=[];
+const second={...structuredClone(c),archived:scenario==='archive',id:'second',title:'另一段会话',messages:[{id:'other',role:'user',text:'第二段对话的唯一内容'}],active:null};
+const storageKey='fixture:'+scenario;
+const records=JSON.parse(sessionStorage.getItem(storageKey)||'null') ?? (scenario.startsWith('first-message')?{}:{fixture:c,second});window.fixtureCalls=[];
 const created={};
 function create(args) {
   const row = created[args.requestKey] ??= {...structuredClone(c),id:crypto.randomUUID(),messages:[],active:null,operations:[]};
@@ -22,7 +23,11 @@ function create(args) {
   return row;
 }
 function send(row,args) {
+  const prior=row.operations.find(op=>op.key===args.key);
+  if(prior)return row;
   const input=args.input;
+  if(args.kind==='stop'){row.active=null;row.operations.push({key:args.key,kind:args.kind,status:'succeeded'});return row;}
+  if(args.kind==='message'){row.messages.push({id:args.key,role:'user',text:input.text});row.operations.push({key:args.key,kind:args.kind,status:'succeeded'});return row;}
   if(args.kind==='answer'&&scenario==='questions'){
     const question=row.active.interactions.find(item=>item.id===input.questionId);
     question.status=input.answer.decision==='submit'?'answered':'cancelled';
@@ -31,15 +36,22 @@ function send(row,args) {
     return row;
   }
   const snapshot=input.snapshot;
-  if(args.kind!=='send'||snapshot.revision!==row.revision||snapshot.draft!==row.draft)throw Error('发送的原始草稿与已保存版本不一致');
-  row.messages.push({id:'first-message',role:'user',text:snapshot.draft});
+  if(args.kind!=='send'||snapshot.revision!==row.revision)throw Error('发送的原始草稿与已保存版本不一致');
+  row.messages.push({id:args.key,role:'user',text:snapshot.draft});
+  row.active={runId:'fixture-run',observedStatus:'running',transcript:[{kind:'text',text:'收到，正在核对材料。'}],interactions:[]};
   row.draft='';row.revision++;
   row.operations.push({key:args.key,kind:args.kind,status:'succeeded'});
   return row;
 }
-const tasks=scenario==='tasks'?[{id:'page-task',revision:1,visibilityRevision:0,title:'改进应用中心：让应用列表更容易查找和操作',goal:'改进应用中心：让应用列表更容易查找和操作',status:'waiting',waitFor:'user',waitReason:'页面已更新，等待你在浏览器中验收',nextStep:'根据你的反馈继续调整筛选与操作布局',summary:'已检查源码、完成布局调整并核对构建结果，等待用户验收',lastActivity:'2026-11-15T10:00:00.000Z',operations:[{operation:'读取应用源码',status:'succeeded',at:'2026-11-15T09:40:00.000Z'},{operation:'检查应用材料',status:'succeeded',at:'2026-11-15T09:50:00.000Z'}],artifacts:[{ref:'artifact',title:'改进说明与验收步骤'}],details:{goal:'改进应用中心：让应用列表更容易查找和操作',runs:['run-1','run-2','run-3'],activeHash:'a'.repeat(64)}},{id:'chat-task',revision:1,visibilityRevision:0,title:'继续整理研究资料',goal:'继续整理研究资料',status:'waiting',waitFor:'user',waitReason:'等待确认研究范围',nextStep:'补充所需主题',summary:'已整理第一轮资料',lastActivity:'2026-11-15T09:00:00.000Z',conversationId:'fixture',artifacts:[],details:{goal:'继续整理研究资料'}}]:[];
-const catalog={providers:[{id:'pi',name:'Pi（隔离提供方）',available:true}],configs:{pi:{models:[{value:'',label:'继承模型'},{value:'fixture/model',label:model}],thinking:['off','minimal','low','medium','high','xhigh','max'],warning:'选项来自隔离合同；不代表真实模型验收。'}},tools:[{module:'author',target:{moduleId:'author-fixture',tool:'submit'},description:'提交固定应用材料，返回真实候选回执。',available:true},{module:'notify',target:{moduleId:'notify-fixture',tool:'send'},description:'通过用户选择的渠道发送通知。',available:true}]};
-async function call(name,args={}){window.fixtureCalls.push({name,args});let result;const row=records[args.id];switch(name){case 'task-view':if(scenario==='task-error')throw Error('Mind 尚未安装或绑定，普通对话仍可使用。');result=args.artifactRef?{title:'改进说明与验收步骤',body:'页面已调整。请检查筛选、卡片操作与手机布局，并补充你的反馈。'}:args.id?tasks.find(t=>t.id===args.id):{items:tasks};break;case 'task-control':{const input=JSON.parse(args.input),task=tasks.find(t=>t.id===input.id);task.revision++;if(input.operation==='pause')task.status='paused';else if(input.operation==='resume')task.status='waiting';else task.goal+='\\n补充要求：'+input.text;result={value:task};break;}case 'catalog':if(scenario==='load-error'&&window.fixtureCalls.filter(c=>c.name==='catalog').length===1)throw Error('暂时无法读取提供方');result=catalog;break;case 'list':result={items:Object.values(records)};break;case 'create':result=create(args);break;case 'execute':result=send(row,args);break;case 'read':result=row;break;case 'draft':Object.assign(row,JSON.parse(args.patch));row.revision++;result=row;break;case 'upload':row.attachments.push({id:'fixture-image',name:args.name});row.revision++;result=row;break;case 'detach':row.attachments=row.attachments.filter(a=>a.id!==args.attachmentId);row.revision++;result=row;break;case 'edit':Object.assign(row,JSON.parse(args.patch));result=row;break;case 'delivery':result=row;break;default:throw Error('preview does not execute '+name);}return {json:JSON.stringify(result)};}
+const toolTrace=[{kind:'tool',tool:'read',callId:'a',args:'first.txt'},{kind:'tool',tool:'read',callId:'b',args:'second.txt'},{kind:'result',tool:'read',callId:'b',text:'second result'},{kind:'result',tool:'read',callId:'a',text:'first result'}];
+let streamStep=0;
+window.advanceFixtureStream=()=>streamStep++;
+function stream(row) {
+  if(streamStep<2) row.active={runId:'live-run',observedStatus:'running',liveReply:streamStep===0?'**正在生成第一段':'**正在生成第一段和第二段**',transcript:toolTrace};
+  else if(row.active) {row.messages.push({id:'live-run',role:'assistant',run:{ended:true,transcript:[...toolTrace,{kind:'text',text:'最终正文'}]}});row.active=null;}
+}
+const catalog={providers:[{id:'pi',name:'Pi（隔离提供方）',available:true,capabilities:{conversation:true,images:true}}],configs:{pi:{models:[{value:'',label:'继承模型'},{value:'fixture/model',label:model}],thinking:['off','minimal','low','medium','high','xhigh','max'],warning:'选项来自隔离合同；不代表真实模型验收。'}},tools:[{module:'author',target:{moduleId:'author-fixture',tool:'submit'},description:'提交固定应用材料，返回真实候选回执。',available:true},{module:'notify',target:{moduleId:'notify-fixture',tool:'send'},description:'通过用户选择的渠道发送通知。',available:true}]};
+async function call(name,args={}){window.fixtureCalls.push({name,args});let result;const row=records[args.id];switch(name){case 'catalog':if(scenario==='load-error'&&window.fixtureCalls.filter(c=>c.name==='catalog').length===1)throw Error('暂时无法读取提供方');result=catalog;break;case 'list':result={items:Object.values(records)};break;case 'create':result=create(args);break;case 'execute':{const accepted=row.operations.some(op=>op.key===args.key);result=send(row,args);sessionStorage.setItem(storageKey,JSON.stringify(records));if(scenario==='first-message-retry'&&args.kind==='send'&&!accepted)throw Error('发送回执暂未收到');break;}case 'read':if(!row)throw Error('会话不存在');if(scenario==='stream'&&args.id==='fixture')stream(row);result=row;break;case 'draft':Object.assign(row,JSON.parse(args.patch));row.revision++;result=row;break;case 'upload':row.attachments.push({id:'fixture-image',name:args.name});row.revision++;result=row;break;case 'detach':row.attachments=row.attachments.filter(a=>a.id!==args.attachmentId);row.revision++;result=row;break;case 'edit':Object.assign(row,JSON.parse(args.patch));result=row;break;case 'delivery':result=row;break;case 'observation-scope':result={revision:1,enabled:true,conversation:{id:args.conversationId,excluded:false,private:false}};break;case 'image':result={mime:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j8x0AAAAASUVORK5CYII='};break;case 'delete':delete records[args.id];result={deleted:args.id};break;default:throw Error('preview does not execute '+name);}sessionStorage.setItem(storageKey,JSON.stringify(records));return {json:JSON.stringify(result)};}
 mountChat(document.querySelector('#chat-preview'),{call});
 `;
 const hostStyle = readFileSync('test-support/host-style.css','utf8');

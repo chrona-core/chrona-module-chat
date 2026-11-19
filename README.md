@@ -24,7 +24,7 @@ bun run test
 bun run build
 ```
 
-`bun run build` 先检查严格 TypeScript，再用 Vite 构建 `dist/ui.js` 和 `dist/ui.css`。构建需要 Bun 和 Node.js（20.19+ 或 22.12+）。工作台、会话列表和消息视图由 React 渲染，复用 Author 模板的 shadcn 按钮和 Tailwind 样式作用域。`index.ts` 在激活时注册两个制品。`chrona-material.json` 列出源码、构建命令及产物摘要；修改或重建产物后应同步摘要和实际使用的工具链版本。
+`bun run build` 先检查严格 TypeScript，再用 Vite 构建 `dist/ui.js` 和 `dist/ui.css`。构建需要 Bun 和 Node.js（20.19+ 或 22.12+）。工作台按 AI Elements 的 Chat、Prompt Input、Model Selector 和 Tool 示例组合组件。会话导航、弹窗、筛选和表单使用 shadcn/ui。`elements/` 保存项目使用的 registry 组件，适配了本地导入、中文标签和 Web 的 portal 容器。`index.ts` 在激活时注册两个制品。`chrona-material.json` 列出源码、构建命令及产物摘要；修改或重建产物后应同步摘要和实际使用的工具链版本。
 
 主要文件：
 
@@ -32,17 +32,18 @@ bun run build
 | --- | --- |
 | `index.ts`、`module.json` | 应用入口、工具合同与 Web 注册 |
 | `state.ts` | 私有会话存储、操作快照与执行恢复 |
-| `client-state.ts` | 浏览器草稿及会话选择状态 |
 | `tool-selection.ts`、`delivery.ts` | 工具发现与选择、交付回执识别 |
-| `workbench.tsx`、`conversation-view.tsx` | 工作台、会话列表和消息视图 |
-| `ui.ts`、`ui.css` | 会话交互、现有工具面板和页面样式 |
+| `chat.tsx` | React 挂载、会话导航、输入与命令恢复 |
+| `thread.tsx` | AI Elements 消息、工具轨迹、图片与 Agent 提问 |
+| `panels.tsx` | 工具设置、Mind 学习范围、交付回执 |
+| `elements/`、`ui.css` | shadcn/ui 组件源码和应用局部样式 |
 | `test-support/` | Web 注册测试工具与浏览器预览样式夹具 |
 
 ## 验证
 
-`bun run test` 显式运行六个离线 Bun 套件：`state.test.ts`、`dom.test.ts`、`race.bun.test.ts`、`web-registration.bun.test.ts`、`selection.bun.test.ts` 和 `create.bun.test.ts`。它们检查状态恢复、DOM 生命周期、客户端竞态、组件与页面注册、工具选择和会话创建，不调用真实模型。注册测试使用随包提供的 Web 合同测试工具；不代表实际安装或浏览器验收。
+`bun run test` 运行会话状态、Agent 准入、回执恢复、Web 注册、Mind 观察和任务代理的离线套件。
 
-`host-agent.integration.test.ts` 是额外的 Chrona 仓库集成测试，使用当前 checkout 的内核、临时数据库和离线 Provider 替身。它依赖仓库依赖及已生成的 Prisma 客户端，不属于上述六个独立套件。仓库数据库模块还会在导入时初始化测试库，因此从本目录运行时需显式指定 checkout 内的迁移目录，并隔离默认数据库与配置：
+`host-agent.integration.test.ts` 是额外的 Chrona 仓库集成测试，使用当前 checkout 的内核、临时数据库和离线 Provider 替身。它依赖仓库依赖及已生成的 Prisma 客户端，不属于上述独立套件。仓库数据库模块还会在导入时初始化测试库，因此从本目录运行时需显式指定 checkout 内的迁移目录，并隔离默认数据库与配置：
 
 ```sh
 (
@@ -59,4 +60,4 @@ bun run build
 
 `test.ts` 是 `module.json` 声明的应用检查入口，还使用宿主提供的 `chrona/testing` SDK 进程测试工具；应通过 Chrona 的应用检查流程运行。
 
-浏览器预览先执行 `bun run build` 和 `bun run browser-fixture.ts`，生成 `browser-fixture.html`。通过本地静态 HTTP 服务打开该文件后，可用 Playwright 执行 `browser-check.js` 中的页面函数。该函数覆盖明暗主题、三种视口及五种合成场景，并将本次截图写入 `screenshots/`。`playwright.config.json` 提供本机 Chromium 路径示例，其他环境需调整。预览使用本地 `test-support/host-style.css` 样式夹具和合成数据，不连接运行中的服务或真实模型；检查脚本的存在不表示检查已执行。
+浏览器预览运行 `bun run build` 和 `bun run browser-fixture.ts`，然后通过本地静态 HTTP 服务打开 `browser-fixture.html`。用 `playwright-cli run-code --filename=browser-check.js` 运行检查，覆盖三个视口和明暗主题、空白页直接发送首条消息、工具弹窗打开时导航位置稳定、就地选择模型、按应用配置工具、运行中增量正文、工具调用结果配对、刷新后核对原发送、运行中补充和停止、提问及归档恢复。预览使用合成数据和宿主样式夹具。

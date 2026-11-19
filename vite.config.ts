@@ -74,6 +74,7 @@ export default defineConfig({
       fileName: () => 'ui.js',
       cssFileName: 'ui',
     },
+    rolldownOptions: { output: { codeSplitting: false } },
     minify: true,
   },
 });

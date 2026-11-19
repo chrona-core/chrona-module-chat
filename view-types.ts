@@ -16,15 +16,17 @@ export type Catalog = {
 export type Attachment = { id: string; name: string };
 export type Run = {
   runId?: string; ended?: boolean; stopRequested?: boolean; stopConfirmed?: boolean;
+  liveReply?: string | null;
   observedStatus?: string; error?: string; gaps?: { message: string }[];
   transcript?: ({ kind: 'text'; text: string } |
-    { kind: 'tool' | 'result'; text?: string; tool?: string; error?: boolean; args?: string })[];
+    { kind: 'tool' | 'result'; text?: string; tool?: string; error?: boolean; args?: string; callId?: string })[];
   events?: { kind: string; payload?: { text?: string } }[];
   interactions?: { id: string; status: string; question: {
     title: string; message: string; method: string; options: string[]; prefill?: string;
   } }[];
 };
 export type Operation = {
+  key: string; kind: string;
   status: string; recoveryNotice?: string; error?: string; snapshot?: { attachments?: Attachment[] };
 };
 export type DeliveryMember = { moduleId: string; hash: string; status: string; name?: string; activation?: string };
@@ -43,6 +45,7 @@ export type Conversation = {
   updatedAt?: string; attachments: Attachment[]; active: Run | null; operations: Operation[];
   settings: { providerId: string; model: string; thinking: string; tools: ToolTarget[] };
   messages: { id: string; role: string; text: string; attachments?: Attachment[]; run?: Run }[];
+  context?: { providerId: string } | null;
   deliveries: Delivery[]; mindContextStatus?: string;
   mindUpdates?: { status: string; goal: string; waitReason?: string; nextStep?: string }[];
 };
