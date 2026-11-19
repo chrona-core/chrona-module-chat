@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from '../locale';
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { cn } from "../cn"
 
@@ -48,6 +49,7 @@ function SheetContent({
   container?: HTMLElement
   showCloseButton?: boolean
 }) {
+  const t = useTranslation();
   return (
     <SheetPortal container={container}>
       <SheetOverlay />
@@ -73,7 +75,7 @@ function SheetContent({
             }
           >
             <XIcon />
-            <span className="sr-only">关闭会话列表</span>
+            <span className="sr-only">{t("关闭会话列表")}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

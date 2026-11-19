@@ -19,6 +19,7 @@
     "elements/alert-dialog.tsx",
     "elements/alert.tsx",
     "elements/attachment.tsx",
+    "elements/badge.tsx",
     "elements/bubble.tsx",
     "elements/card.tsx",
     "elements/checkbox.tsx",
@@ -41,10 +42,13 @@
     "elements/sheet.tsx",
     "elements/sidebar-menu.tsx",
     "elements/tabs.tsx",
+    "elements/tool.tsx",
     "elements/trace.tsx",
     "frontend-context.ts",
     "host-agent.integration.test.ts",
     "index.ts",
+    "locale-en.json",
+    "locale.ts",
     "input.tsx",
     "mind-tasks.ts",
     "mind-updates.bun.test.ts",
@@ -76,11 +80,11 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "1b7af07d85bc8f286c9a3121be83af220a841c1731b9df5f414f64e6e4c1e477"
+      "sha256": "8137dcf29f505f3366980b838c6f7cad160c6ab8ee4760790bfd7f6063f0bb5a"
     },
     {
       "path": "dist/ui.css",
-      "sha256": "aad05497f61eeb798042385c488c09c8a0eb236b2c0f233825afdff5330c3016"
+      "sha256": "07911476c556c93dc521b9691db8584f0c39da289bef2195e3bf9344257b9712"
     }
   ],
   "build": {

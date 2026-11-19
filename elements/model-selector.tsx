@@ -9,6 +9,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "./command";
+import { useTranslation } from '../locale';
 import {
   Dialog,
   DialogContent,
@@ -37,9 +38,11 @@ export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
 export const ModelSelectorContent = ({
   className,
   children,
-  title = "模型选择",
+  title,
   ...props
-}: ModelSelectorContentProps) => (
+}: ModelSelectorContentProps) => {
+  const t = useTranslation();
+  return (
   <DialogContent
     showCloseButton={false}
     aria-describedby={undefined}
@@ -49,12 +52,13 @@ export const ModelSelectorContent = ({
     )}
     {...props}
   >
-    <DialogTitle className="sr-only">{title}</DialogTitle>
+    <DialogTitle className="sr-only">{title ?? t("模型选择")}</DialogTitle>
     <Command className="**:data-[slot=command-input-wrapper]:h-auto">
       {children}
     </Command>
   </DialogContent>
-);
+  );
+};
 
 export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>;
 

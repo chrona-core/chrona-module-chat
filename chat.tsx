@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ChatLocale, type Locale, useTranslation } from './locale';
 import { ArrowUp, Brain, ChevronDown, Ellipsis, Menu, Paperclip, Plus, Search, Settings2, Square, X } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
@@ -31,6 +32,7 @@ const messageOf = (error: unknown) => error instanceof Error ? error.message : S
 function selectedId() { return new URL(location.href).searchParams.get(conversationParam) ?? ''; }
 
 function Chat({ api, container }: { api: Api; container: HTMLElement }) {
+  const t = useTranslation();
   const [id, setId] = useState(selectedId);
   const [loaded, setLoaded] = useState<Conversation>();
   const [items, setItems] = useState<ConversationSummary[]>([]);
@@ -193,11 +195,11 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
     update(next);
     const result = next.operations.find(o => o.key === key);
     if (!result || !['succeeded', 'failed', 'rejected'].includes(result.status)) {
-      throw Error(result?.recoveryNotice ?? result?.error ?? '请求结果待确认，请核对原请求。');
+      throw Error(result?.recoveryNotice ?? result?.error ?? t('请求结果待确认，请核对原请求。'));
     }
     sessionStorage.removeItem(requestKey(target));
     setRetry(undefined);
-    if (result.status !== 'succeeded') throw Error(result.error ?? '操作失败');
+    if (result.status !== 'succeeded') throw Error(result.error ?? t('操作失败'));
     if (command.text !== undefined && sessionStorage.getItem(draftKey(target)) === command.text) {
       sessionStorage.setItem(draftKey(target), '');
       setDrafts(previous => ({...previous, [target]: ''}));
@@ -231,7 +233,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
     if (active || pending || currentRequest || !files.length || (!conversation && (!ready || !catalog || retryCreate))) return;
     void task(async () => {
       const oversized = [...files].find(file => file.size > 2 * 1024 * 1024);
-      if (oversized) throw Error(`${oversized.name} 超过 2 MiB`);
+      if (oversized) throw Error(t('{0} 超过 2 MiB', oversized.name));
       const target = conversation ?? await create();
       if (!target) return;
       for (const file of files) {
@@ -252,7 +254,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
   const pickerProviders = contextProvider ? available.filter(p => p.id === contextProvider) : available;
   const effortLevels = provider ? catalog?.configs[provider.id]?.thinking ?? [] : [];
   const effort = conversation?.settings.thinking ?? '';
-  const effortLabels: Record<string, string> = {off:'关闭', minimal:'最低', low:'低', medium:'中', high:'高', xhigh:'很高', max:'最高'};
+  const effortLabels: Record<string, string> = {off:t('关闭'), minimal:t('最低'), low:t('低'), medium:t('中'), high:t('高'), xhigh:t('很高'), max:t('最高')};
   const settingsLocked = busy || !!active || !!pending || !!currentRequest || (!id && (!ready || !catalog || retryCreate));
   function saveSettings(patch: Partial<Conversation['settings']>, close?: () => void) {
     return task(async () => {
@@ -295,85 +297,85 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
     return task(async () => update(await api('edit', {id: row.id, patch: JSON.stringify({[field]: !row[field]})})));
   }
 
-  const title = {tools: '应用工具', manage: '管理对话', rename: '重命名对话', run: '执行记录', delivery: '应用交付', scope: 'Mind 学习范围', image: image?.name ?? '附件'};
+  const title = {tools: t('应用工具'), manage: t('管理对话'), rename: t('重命名对话'), run: t('执行记录'), delivery: t('应用交付'), scope: t('Mind 学习范围'), image: image?.name ?? t('附件')};
   const confirmationDialog = conversation && (<AlertDialog open={confirmation !== null} onOpenChange={open => {if (!open) {setConfirmation(null); if (panel === 'confirm') setPanel(null);}}}>
           <AlertDialogContent container={container} initialFocus={cancelConfirmation} finalFocus={confirmationTrigger}>
             <AlertDialogHeader>
-              <AlertDialogTitle>{confirmation === 'delete' ? '删除对话？' : '重置执行上下文？'}</AlertDialogTitle>
-              <AlertDialogDescription>{confirmation === 'delete' ? `将删除「${conversation.title}」及其附件。此操作无法撤销。` : '后续执行将使用新的上下文，现有对话消息会保留。'}</AlertDialogDescription>
+              <AlertDialogTitle>{confirmation === 'delete' ? t('删除对话？') : t('重置执行上下文？')}</AlertDialogTitle>
+              <AlertDialogDescription>{confirmation === 'delete' ? t('将删除「{0}」及其附件。此操作无法撤销。', conversation.title) : t('后续执行将使用新的上下文，现有对话消息会保留。')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel ref={cancelConfirmation}>取消</AlertDialogCancel>
+              <AlertDialogCancel ref={cancelConfirmation}>{t("取消")}</AlertDialogCancel>
               <AlertDialogAction variant={confirmation === 'delete' ? 'destructive' : 'default'} disabled={!canChangeContext || (confirmation === 'delete' && !!currentRequest)} onClick={confirmConversationChange}>
-                {confirmation === 'delete' ? '删除对话' : '重置执行上下文'}
+                {confirmation === 'delete' ? t('删除对话') : t('重置执行上下文')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>);
   const conversationList = <>
-      <Button className="chat-new" disabled={busy} onClick={() => {select(''); requestAnimationFrame(() => composerInput.current?.focus());}}><Plus />新对话</Button>
-      <Input aria-label="搜索对话" placeholder="搜索对话" value={query} onChange={e => setQuery(e.target.value)} />
+      <Button className="chat-new" disabled={busy} onClick={() => {select(''); requestAnimationFrame(() => composerInput.current?.focus());}}><Plus />{t("新对话")}</Button>
+      <Input aria-label={t("搜索对话")} placeholder={t("搜索对话")} value={query} onChange={e => setQuery(e.target.value)} />
       <Tabs className="min-h-0 flex-1" value={archived ? 'archived' : 'current'} onValueChange={value => setArchived(value === 'archived')}>
-        <TabsList aria-label="筛选对话" className="min-h-10 w-full shrink-0" activateOnFocus>
-          <TabsTrigger value="current" className="data-active:font-semibold">未归档</TabsTrigger>
-          <TabsTrigger value="archived" className="data-active:font-semibold">已归档</TabsTrigger>
+        <TabsList aria-label={t("筛选对话")} className="min-h-10 w-full shrink-0" activateOnFocus>
+          <TabsTrigger value="current" className="data-active:font-semibold">{t("未归档")}</TabsTrigger>
+          <TabsTrigger value="archived" className="data-active:font-semibold">{t("已归档")}</TabsTrigger>
         </TabsList>
         {(['current', 'archived'] as const).map(value => <TabsContent key={value} value={value} className="min-h-0 overflow-y-auto">
           {(value === 'archived') === archived && (
-            <nav aria-label="会话列表">
+            <nav aria-label={t("会话列表")}>
               <SidebarMenu>{visible.map(row => <SidebarMenuItem key={row.id} className="flex items-center gap-1">
                 <SidebarMenuButton type="button" className="chat-conversation-title min-w-0 flex-1" title={row.title} isActive={id === row.id} aria-current={id === row.id ? 'page' : undefined} onClick={() => select(row.id)}>
-                  {row.pinned && <span aria-label="已置顶">↟</span>}<span className="truncate">{row.title}</span>
+                  {row.pinned && <span aria-label={t("已置顶")}>↟</span>}<span className="truncate">{row.title}</span>
                 </SidebarMenuButton>
                 <DropdownMenu modal={false}>
-                  <DropdownMenuTrigger asChild><Button type="button" size="icon-sm" variant="ghost" aria-label={`操作：${row.title}`}><Ellipsis /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent container={drawer ? drawerContainer ?? container : container} align="end" aria-label={`${row.title}的操作`}>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'rename')}>重命名</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'pinned')}>{row.pinned ? '取消置顶' : '置顶'}</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'archived')}>{row.archived ? '取消归档' : '归档'}</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'run')}>执行记录</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'delivery')}>应用交付</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'scope')}>Mind 学习范围</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} onSelect={() => openConversationPanel(row, 'manage', 'new-context')}>重置执行上下文</DropdownMenuItem>
-                    <DropdownMenuItem disabled={busy} variant="destructive" onSelect={() => openConversationPanel(row, 'manage', 'delete')}>删除对话</DropdownMenuItem>
+                  <DropdownMenuTrigger asChild><Button type="button" size="icon-sm" variant="ghost" aria-label={t('操作：{0}', row.title)}><Ellipsis /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent container={drawer ? drawerContainer ?? container : container} align="end" aria-label={t('{0}的操作', row.title)}>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'rename')}>{t("重命名")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'pinned')}>{row.pinned ? t('取消置顶') : t('置顶')}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onSelect={() => void toggleConversation(row, 'archived')}>{row.archived ? t('取消归档') : t('归档')}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'run')}>{t("执行记录")}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'delivery')}>{t("应用交付")}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConversationPanel(row, 'scope')}>{t("Mind 学习范围")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onSelect={() => openConversationPanel(row, 'manage', 'new-context')}>{t("重置执行上下文")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} variant="destructive" onSelect={() => openConversationPanel(row, 'manage', 'delete')}>{t("删除对话")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>)}</SidebarMenu>
-              {ready && !visible.length && <Empty className="chat-list-empty"><EmptyTitle>{query ? '没有匹配的对话' : archived ? '没有归档对话' : '还没有对话'}</EmptyTitle></Empty>}
+              {ready && !visible.length && <Empty className="chat-list-empty"><EmptyTitle>{query ? t('没有匹配的对话') : archived ? t('没有归档对话') : t('还没有对话')}</EmptyTitle></Empty>}
             </nav>
           )}
         </TabsContent>)}
       </Tabs>
   </>;
   return <div className="chat-layout">
-    <aside className="chat-sidebar" aria-label="聊天导航"><strong className="chat-sidebar-heading">对话</strong>{conversationList}</aside>
+    <aside className="chat-sidebar" aria-label={t("聊天导航")}><strong className="chat-sidebar-heading">{t("对话")}</strong>{conversationList}</aside>
     <main className="chat-main">
       <header className="chat-header">
         <Sheet open={drawer} onOpenChange={setDrawer} modal="trap-focus">
-          <SheetTrigger render={<Button variant="ghost" size="icon-sm" aria-label="打开会话列表" className="chat-mobile" />}><Menu /></SheetTrigger>
-          <SheetContent ref={setDrawerContainer} container={container} side="left" className="chat-sidebar chat-sidebar-sheet"><SheetTitle>对话</SheetTitle>{conversationList}</SheetContent>
+          <SheetTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t("打开会话列表")} className="chat-mobile" />}><Menu /></SheetTrigger>
+          <SheetContent ref={setDrawerContainer} container={container} side="left" className="chat-sidebar chat-sidebar-sheet"><SheetTitle>{t("对话")}</SheetTitle>{conversationList}</SheetContent>
         </Sheet>
-        <h1>{conversation?.title ?? items.find(c => c.id === id)?.title ?? '对话'}</h1>
-        {!!id && <Button className="chat-mobile" size="icon-sm" aria-label="新对话" disabled={busy} onClick={() => select('')}><Plus /></Button>}
-        {conversation && <><span className="chat-run-status" role="status">{active ? active.stopRequested ? '正在停止' : '运行中' : ''}</span><Button variant="ghost" size="icon-sm" aria-label="搜索消息" onClick={() => setFind(find === null ? '' : null)}><Search /></Button><Button variant="ghost" size="icon-sm" aria-label="管理对话" onClick={() => setPanel('manage')}><Ellipsis /></Button></>}
+        <h1>{conversation?.title ?? items.find(c => c.id === id)?.title ?? t('对话')}</h1>
+        {!!id && <Button className="chat-mobile" size="icon-sm" aria-label={t("新对话")} disabled={busy} onClick={() => select('')}><Plus /></Button>}
+        {conversation && <><span className="chat-run-status" role="status">{active ? active.stopRequested ? t('正在停止') : t('运行中') : ''}</span><Button variant="ghost" size="icon-sm" aria-label={t("搜索消息")} onClick={() => setFind(find === null ? '' : null)}><Search /></Button><Button variant="ghost" size="icon-sm" aria-label={t("管理对话")} onClick={() => setPanel('manage')}><Ellipsis /></Button></>}
       </header>
-      {find !== null && <div className="chat-find"><Input autoFocus aria-label="搜索消息" placeholder="搜索本对话的消息" value={find} onChange={e => setFind(e.target.value)} /><Button variant="ghost" size="icon-sm" aria-label="关闭搜索" onClick={() => setFind(null)}><X /></Button></div>}
-      {(error || readError || currentRequest || pending || retryCreate) && <Alert variant="destructive" className="chat-notice"><AlertDescription>{error || readError || pending?.recoveryNotice || '请求结果待确认'}</AlertDescription>{retryCreate && !currentRequest ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(() => create())}>核对新对话</Button> : currentRequest ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(() => execute(currentRequest))}>核对原请求</Button> : pending ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(async () => update(await api('read', {id})))}>核对请求</Button> : !ready || !catalog ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(initialize)}>重试</Button> : <Button variant="ghost" size="icon-sm" aria-label="关闭提示" onClick={() => {setError(''); setReadError('');}}><X /></Button>}</Alert>}
+      {find !== null && <div className="chat-find"><Input autoFocus aria-label={t("搜索消息")} placeholder={t("搜索本对话的消息")} value={find} onChange={e => setFind(e.target.value)} /><Button variant="ghost" size="icon-sm" aria-label={t("关闭搜索")} onClick={() => setFind(null)}><X /></Button></div>}
+      {(error || readError || currentRequest || pending || retryCreate) && <Alert variant="destructive" className="chat-notice"><AlertDescription>{error || readError || pending?.recoveryNotice || t('请求结果待确认')}</AlertDescription>{retryCreate && !currentRequest ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(() => create())}>{t("核对新对话")}</Button> : currentRequest ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(() => execute(currentRequest))}>{t("核对原请求")}</Button> : pending ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(async () => update(await api('read', {id})))}>{t("核对请求")}</Button> : !ready || !catalog ? <Button variant="outline" size="sm" disabled={busy} onClick={() => void task(initialize)}>{t("重试")}</Button> : <Button variant="ghost" size="icon-sm" aria-label={t("关闭提示")} onClick={() => {setError(''); setReadError('');}}><X /></Button>}</Alert>}
       {conversation ? <Thread key={id} conversation={conversation} query={find ?? ''} disabled={busy || !!currentRequest || !!pending} answer={(questionId, answer) => run('answer', {questionId, answer, runId: active?.runId})} showImage={attachment => void task(async () => {
         const data = await api<{ mime: string; base64: string }>('image', {id, attachmentId: attachment.id});
         setImage({ name: attachment.name, src: `data:${data.mime};base64,${data.base64}` }); setPanel('image');
-      })} /> : id && <div className="chat-welcome" role="status">{readError ? '无法打开对话' : '正在读取对话…'}</div>}
+      })} /> : id && <div className="chat-welcome" role="status">{readError ? t('无法打开对话') : t('正在读取对话…')}</div>}
       {(conversation || !id) && <form className={`chat-composer${id ? '' : ' chat-composer-start'}`} onDragOver={e => {if (e.dataTransfer.types.includes('Files')) e.preventDefault();}} onDrop={e => {if (e.dataTransfer.files.length) {e.preventDefault(); upload(e.dataTransfer.files);}}} onSubmit={e => {e.preventDefault(); send();}}>
-        {!id && <h2>想做些什么？</h2>}
+        {!id && <h2>{t("想做些什么？")}</h2>}
         <InputGroup className="chat-prompt overflow-hidden bg-background dark:bg-background">
           {!!conversation?.attachments.length && <InputGroupAddon align="block-start">
             <AttachmentGroup>{conversation.attachments.map(file => <Attachment key={file.id} size="sm">
               <Paperclip size={14} /><AttachmentTitle>{file.name}</AttachmentTitle>
-              <AttachmentActions><AttachmentAction type="button" aria-label={`移除 ${file.name}`} disabled={busy || !!pending || !!currentRequest} onClick={() => void task(async () => update(await api('detach', {id, attachmentId: file.id})))}><X /></AttachmentAction></AttachmentActions>
+              <AttachmentActions><AttachmentAction type="button" aria-label={t('移除 {0}', file.name)} disabled={busy || !!pending || !!currentRequest} onClick={() => void task(async () => update(await api('detach', {id, attachmentId: file.id})))}><X /></AttachmentAction></AttachmentActions>
             </Attachment>)}</AttachmentGroup>
           </InputGroupAddon>}
-          <label className="sr-only" htmlFor="chat-message">消息</label>
-          <InputGroupTextarea className="min-h-16 max-h-[24dvh] p-3" ref={composerInput} id="chat-message" value={text} onChange={e => writeDraft(e.target.value)} placeholder={active ? '给正在运行的 Agent 补充指令…' : id ? '输入消息，或粘贴图片…' : '输入第一条消息，或粘贴图片…'} onPaste={e => {
+          <label className="sr-only" htmlFor="chat-message">{t("消息")}</label>
+          <InputGroupTextarea className="min-h-16 max-h-[24dvh] p-3" ref={composerInput} id="chat-message" value={text} onChange={e => writeDraft(e.target.value)} placeholder={active ? t('给正在运行的 Agent 补充指令…') : id ? t('输入消息，或粘贴图片…') : t('输入第一条消息，或粘贴图片…')} onPaste={e => {
             const images = [...e.clipboardData.files].filter(file => file.type.startsWith('image/'));
             if (images.length && !settingsLocked) {e.preventDefault(); upload(images);}
           }} onKeyDown={e => {
@@ -382,21 +384,21 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
           }} />
           <InputGroupAddon align="block-end" className="gap-1 border-t border-input bg-muted px-2 py-2">
             <Input ref={fileInput} type="file" hidden multiple accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => {if (e.currentTarget.files) upload(e.currentTarget.files); e.currentTarget.value = '';}} />
-            <InputGroupButton type="button" variant="outline" size="icon-sm" className="rounded-full" aria-label="添加图片" disabled={settingsLocked} onClick={() => fileInput.current?.click()}><Plus /></InputGroupButton>
+            <InputGroupButton type="button" variant="outline" size="icon-sm" className="rounded-full" aria-label={t("添加图片")} disabled={settingsLocked} onClick={() => fileInput.current?.click()}><Plus /></InputGroupButton>
             <ModelSelector open={modelOpen} onOpenChange={setModelOpen} modal="trap-focus">
-              <ModelSelectorTrigger render={<InputGroupButton ref={modelTrigger} type="button" variant="ghost" size="sm" className="min-w-0 max-w-[min(38vw,350px)] shrink" aria-label="选择模型" disabled={settingsLocked} />}>
-                <span className="truncate">{conversation?.settings.model || provider?.name || '选择模型'}</span><ChevronDown />
+              <ModelSelectorTrigger render={<InputGroupButton ref={modelTrigger} type="button" variant="ghost" size="sm" className="min-w-0 max-w-[min(38vw,350px)] shrink" aria-label={t("选择模型")} disabled={settingsLocked} />}>
+                <span className="truncate">{conversation?.settings.model || provider?.name || t('选择模型')}</span><ChevronDown />
               </ModelSelectorTrigger>
               <ModelSelectorContent container={container} initialFocus={modelSearch} finalFocus={modelTrigger}>
-                <ModelSelectorInput ref={modelSearch} aria-label="搜索模型" placeholder="搜索模型" onKeyDown={event => {
+                <ModelSelectorInput ref={modelSearch} aria-label={t("搜索模型")} placeholder={t("搜索模型")} onKeyDown={event => {
                   if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.stopPropagation();
                 }} />
                 <ModelSelectorList className="max-h-[min(50dvh,320px)]">
-                  <ModelSelectorEmpty>{!catalog ? '正在读取模型目录…' : pickerProviders.length ? '没有匹配的模型' : '没有可用的执行提供方'}</ModelSelectorEmpty>
+                  <ModelSelectorEmpty>{!catalog ? t('正在读取模型目录…') : pickerProviders.length ? t('没有匹配的模型') : t('没有可用的执行提供方')}</ModelSelectorEmpty>
                   {pickerProviders.map(candidate => {
                     const config = catalog?.configs[candidate.id];
                     const sameProvider = candidate.id === conversation?.settings.providerId;
-                    const models = [{value:'', label:'继承提供方设置'}, ...(config?.models ?? []).filter(model => model.value)];
+                    const models = [{value:'', label:t('继承提供方设置')}, ...(config?.models ?? []).filter(model => model.value)];
                     return <ModelSelectorGroup key={candidate.id} heading={candidate.name} className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:gap-1">
                       {models.map(model => <ModelSelectorItem key={model.value} className="min-h-11 cursor-pointer border border-transparent px-3 data-[selected=true]:border-input" value={JSON.stringify([candidate.id, model.value])} keywords={[candidate.name, model.label]} disabled={settingsLocked} data-checked={sameProvider && model.value === conversation?.settings.model} onSelect={() => void saveSettings({
                         providerId: candidate.id, model: model.value, thinking: sameProvider ? effort : '',
@@ -411,20 +413,20 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
               </ModelSelectorContent>
             </ModelSelector>
             {!!effortLevels.length && <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild><InputGroupButton type="button" variant="ghost" size="sm" aria-label="思考强度" className="chat-effort" disabled={settingsLocked}><Brain /><span>{effort ? effortLabels[effort] ?? effort : '默认'}</span><ChevronDown /></InputGroupButton></DropdownMenuTrigger>
-              <DropdownMenuContent container={container} side="top" align="start" aria-label="思考强度">
+              <DropdownMenuTrigger asChild><InputGroupButton type="button" variant="ghost" size="sm" aria-label={t("思考强度")} className="chat-effort" disabled={settingsLocked}><Brain /><span>{effort ? effortLabels[effort] ?? effort : t('默认')}</span><ChevronDown /></InputGroupButton></DropdownMenuTrigger>
+              <DropdownMenuContent container={container} side="top" align="start" aria-label={t("思考强度")}>
                 <DropdownMenuRadioGroup value={effort} onValueChange={thinking => void saveSettings({thinking})}>
-                  <DropdownMenuRadioItem value="">继承提供方设置</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="">{t("继承提供方设置")}</DropdownMenuRadioItem>
                   {effortLevels.filter(Boolean).map(level => <DropdownMenuRadioItem key={level} value={level}>{effortLabels[level] ?? level}</DropdownMenuRadioItem>)}
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>}
-            <InputGroupButton type="button" variant="ghost" size="sm" className="chat-tools-button" aria-label={conversation ? `应用工具（已选 ${conversation.settings.tools.length}/${catalog?.toolLimit ?? 100}）` : '应用工具'} disabled={settingsLocked || !catalog} onClick={() => {
+            <InputGroupButton type="button" variant="ghost" size="sm" className="chat-tools-button" aria-label={conversation ? t('应用工具（已选 {0}/{1}）', conversation.settings.tools.length, catalog?.toolLimit ?? 100) : t('应用工具')} disabled={settingsLocked || !catalog} onClick={() => {
               if (conversation) setPanel('tools');
               else void task(async () => { if (await create()) setPanel('tools'); });
-            }}><Settings2 /><span>应用工具</span>{conversation && <span>{conversation.settings.tools.length}/{catalog?.toolLimit ?? 100}</span>}</InputGroupButton>
-            {active && <InputGroupButton type="button" variant="outline" size="icon-sm" className="ml-auto rounded-full" aria-label="停止运行" disabled={busy || !active.runId || !!active.stopRequested || !!pending || !!currentRequest} onClick={() => run('stop', {runId: active.runId})}><Square /></InputGroupButton>}
-            <InputGroupButton type="submit" size="icon-sm" className={active ? 'rounded-full' : 'ml-auto rounded-full'} aria-label={active ? '补充指令' : '发送消息'} disabled={busy || !!pending || !!currentRequest || (!id && (!ready || !catalog || retryCreate)) || (!!active && !active.runId) || (!text.trim() && (!!active || !conversation?.attachments.length))}><ArrowUp /></InputGroupButton>
+            }}><Settings2 /><span>{t("应用工具")}</span>{conversation && <span>{conversation.settings.tools.length}/{catalog?.toolLimit ?? 100}</span>}</InputGroupButton>
+            {active && <InputGroupButton type="button" variant="outline" size="icon-sm" className="ml-auto rounded-full" aria-label={t("停止运行")} disabled={busy || !active.runId || !!active.stopRequested || !!pending || !!currentRequest} onClick={() => run('stop', {runId: active.runId})}><Square /></InputGroupButton>}
+            <InputGroupButton type="submit" size="icon-sm" className={active ? 'rounded-full' : 'ml-auto rounded-full'} aria-label={active ? t('补充指令') : t('发送消息')} disabled={busy || !!pending || !!currentRequest || (!id && (!ready || !catalog || retryCreate)) || (!!active && !active.runId) || (!text.trim() && (!!active || !conversation?.attachments.length))}><ArrowUp /></InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
       </form>}
@@ -433,18 +435,18 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
       <DialogContent container={container} className="max-h-[86dvh] overflow-auto overscroll-contain sm:max-w-xl">
         <DialogHeader><DialogTitle>{title[panel]}</DialogTitle></DialogHeader>
         {panel === 'tools' && conversation && catalog && <Tools key={id} conversation={conversation} catalog={catalog} busy={settingsLocked} save={settings => saveSettings(settings, () => setPanel(null))} />}
-        {panel === 'run' && conversation && <div className="grid gap-3">{active && <p>当前执行 · {active.observedStatus || '正在启动'}{active.runId && <><br /><code>{active.runId}</code></>}</p>}{!conversation.operations.length && <p>还没有执行记录</p>}{[...conversation.operations].reverse().map(op => <Card size="sm" key={op.key}><CardHeader><CardTitle>{{send:'发送', message:'补充', stop:'停止', answer:'回答'}[op.kind] ?? op.kind} · {{succeeded:'已受理', rejected:'已拒绝', failed:'失败'}[op.status] ?? '待确认'}</CardTitle></CardHeader><CardContent>{(op.error || op.recoveryNotice) && <p>{op.recoveryNotice || op.error}</p>}<Collapsible><CollapsibleTrigger asChild><Button variant="link" size="sm">请求编号</Button></CollapsibleTrigger><CollapsibleContent><code>{op.key}</code></CollapsibleContent></Collapsible></CardContent></Card>)}</div>}
+        {panel === 'run' && conversation && <div className="grid gap-3">{active && <p>{t("当前执行 ·")} {active.observedStatus || t('正在启动')}{active.runId && <><br /><code>{active.runId}</code></>}</p>}{!conversation.operations.length && <p>{t("还没有执行记录")}</p>}{[...conversation.operations].reverse().map(op => <Card size="sm" key={op.key}><CardHeader><CardTitle>{{send:t('发送'), message:t('补充'), stop:t('停止'), answer:t('回答')}[op.kind] ?? op.kind} · {{succeeded:t('已受理'), rejected:t('已拒绝'), failed:t('失败')}[op.status] ?? t('待确认')}</CardTitle></CardHeader><CardContent>{(op.error || op.recoveryNotice) && <p>{op.recoveryNotice || op.error}</p>}<Collapsible><CollapsibleTrigger asChild><Button variant="link" size="sm">{t("请求编号")}</Button></CollapsibleTrigger><CollapsibleContent><code>{op.key}</code></CollapsibleContent></Collapsible></CardContent></Card>)}</div>}
         {panel === 'scope' && <Scope api={api} id={id} run={task} busy={busy} />}
         {panel === 'delivery' && conversation && <Delivery conversation={conversation} busy={busy} refresh={() => task(async () => update(await api('delivery', {id})))} />}
         {panel === 'image' && image && <img className="chat-image" src={image.src} alt={image.name} />}
-        {panel !== 'tools' && panel !== 'image' && !conversation && <p role="status">{readError || '正在读取对话…'}</p>}
-        {(panel === 'manage' || panel === 'rename') && conversation && (<form onSubmit={e => {e.preventDefault(); const title = String(new FormData(e.currentTarget).get('title')).trim(); void task(async () => {update(await api('edit', {id, patch: JSON.stringify({title})})); setPanel(null);});}}><FieldGroup className="gap-3"><Field><FieldLabel htmlFor="chat-rename">对话名称</FieldLabel><Input id="chat-rename" name="title" defaultValue={conversation.title} required maxLength={120} /></Field><div className="flex justify-end"><Button disabled={busy} type="submit">重命名</Button></div></FieldGroup></form>)}
+        {panel !== 'tools' && panel !== 'image' && !conversation && <p role="status">{readError || t('正在读取对话…')}</p>}
+        {(panel === 'manage' || panel === 'rename') && conversation && (<form onSubmit={e => {e.preventDefault(); const title = String(new FormData(e.currentTarget).get('title')).trim(); void task(async () => {update(await api('edit', {id, patch: JSON.stringify({title})})); setPanel(null);});}}><FieldGroup className="gap-3"><Field><FieldLabel htmlFor="chat-rename">{t("对话名称")}</FieldLabel><Input id="chat-rename" name="title" defaultValue={conversation.title} required maxLength={120} /></Field><div className="flex justify-end"><Button disabled={busy} type="submit">{t("重命名")}</Button></div></FieldGroup></form>)}
         {panel === 'manage' && conversation && <div className="grid gap-4">
           <div className="flex flex-wrap gap-2">
-            {(['pinned', 'archived'] as const).map((field, i) => <Button key={field} variant="outline" disabled={busy} onClick={() => void task(async () => {update(await api('edit', {id, patch: JSON.stringify({[field]: !conversation[field]})})); setPanel(null);})}>{`${conversation[field] ? '取消' : ''}${['置顶', '归档'][i]}`}</Button>)}
-            <Button variant="outline" onClick={() => setPanel('run')}>执行记录</Button><Button variant="outline" onClick={() => setPanel('delivery')}>应用交付</Button><Button variant="outline" onClick={() => setPanel('scope')}>Mind 学习范围</Button>
-            <Button variant="outline" disabled={!canChangeContext} onClick={event => {confirmationTrigger.current = event.currentTarget; setConfirmation('new-context');}}>重置执行上下文</Button>
-            <Button variant="destructive" disabled={!canChangeContext || !!currentRequest} onClick={event => {confirmationTrigger.current = event.currentTarget; setConfirmation('delete');}}>删除对话</Button>
+            {(['pinned', 'archived'] as const).map(field => <Button key={field} variant="outline" disabled={busy} onClick={() => void task(async () => {update(await api('edit', {id, patch: JSON.stringify({[field]: !conversation[field]})})); setPanel(null);})}>{t(field === 'pinned' ? conversation.pinned ? '取消置顶' : '置顶' : conversation.archived ? '取消归档' : '归档')}</Button>)}
+            <Button variant="outline" onClick={() => setPanel('run')}>{t("执行记录")}</Button><Button variant="outline" onClick={() => setPanel('delivery')}>{t("应用交付")}</Button><Button variant="outline" onClick={() => setPanel('scope')}>{t("Mind 学习范围")}</Button>
+            <Button variant="outline" disabled={!canChangeContext} onClick={event => {confirmationTrigger.current = event.currentTarget; setConfirmation('new-context');}}>{t("重置执行上下文")}</Button>
+            <Button variant="destructive" disabled={!canChangeContext || !!currentRequest} onClick={event => {confirmationTrigger.current = event.currentTarget; setConfirmation('delete');}}>{t("删除对话")}</Button>
           </div>
         </div>}
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -455,7 +457,7 @@ function Chat({ api, container }: { api: Api; container: HTMLElement }) {
   </div>;
 }
 
-export default function mount(element: HTMLElement, host: {call(name: string, args: Record<string, unknown>): Promise<{json: string}>}) {
+export default function mount(element: HTMLElement, host: { readonly locale?: Locale; subscribeLocale?(listener: (locale: Locale) => void): () => void; call(name: string, args: Record<string, unknown>): Promise<{json: string}>}) {
   const container = document.createElement('div');
   container.dataset.chronaApp = 'chat';
   container.className = 'chat-workbench';
@@ -470,8 +472,14 @@ export default function mount(element: HTMLElement, host: {call(name: string, ar
   window.visualViewport?.addEventListener('resize', sizeWorkspace);
   const root = createRoot(container);
   const api: Api = async (name, args = {}) => JSON.parse((await host.call(name, args)).json);
-  root.render(<Chat api={api} container={container} />);
+  const render = (locale: Locale) => {
+    container.lang = locale;
+    root.render(<ChatLocale value={locale}><Chat api={api} container={container} /></ChatLocale>);
+  };
+  const unsubscribe = host.subscribeLocale?.(render);
+  render(host.locale ?? 'zh-CN');
   return () => {
+    unsubscribe?.();
     window.removeEventListener('resize', sizeWorkspace);
     window.visualViewport?.removeEventListener('resize', sizeWorkspace);
     root.unmount();

@@ -52,7 +52,20 @@ function stream(row) {
 }
 const catalog={providers:[{id:'pi',name:'Pi（隔离提供方）',available:true,capabilities:{conversation:true,images:true}}],configs:{pi:{models:[{value:'',label:'继承模型'},{value:'fixture/model',label:model}],thinking:['off','minimal','low','medium','high','xhigh','max'],warning:'选项来自隔离合同；不代表真实模型验收。'}},tools:[{module:'author',name:'submit',target:{moduleId:'author-fixture',tool:'submit'},description:'提交固定应用材料，返回真实候选回执。',available:true},{module:'notify',name:'send',target:{moduleId:'notify-fixture',tool:'send'},description:'通过用户选择的渠道发送通知。',available:true}]};
 async function call(name,args={}){window.fixtureCalls.push({name,args});let result;const row=records[args.id];switch(name){case 'catalog':if(scenario==='load-error'&&window.fixtureCalls.filter(c=>c.name==='catalog').length===1)throw Error('暂时无法读取提供方');result=catalog;break;case 'list':result={items:Object.values(records)};break;case 'create':result=create(args);break;case 'execute':{const accepted=row.operations.some(op=>op.key===args.key);result=send(row,args);sessionStorage.setItem(storageKey,JSON.stringify(records));if(scenario==='first-message-retry'&&args.kind==='send'&&!accepted)throw Error('发送回执暂未收到');break;}case 'read':if(!row)throw Error('会话不存在');if(scenario==='stream'&&args.id==='fixture')stream(row);result=row;break;case 'draft':Object.assign(row,JSON.parse(args.patch));row.revision++;result=row;break;case 'upload':row.attachments.push({id:'fixture-image',name:args.name});row.revision++;result=row;break;case 'detach':row.attachments=row.attachments.filter(a=>a.id!==args.attachmentId);row.revision++;result=row;break;case 'edit':Object.assign(row,JSON.parse(args.patch));result=row;break;case 'delivery':result=row;break;case 'observation-scope':result={revision:1,enabled:true,conversation:{id:args.conversationId,excluded:false,private:false}};break;case 'image':result={mime:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j8x0AAAAASUVORK5CYII='};break;case 'delete':delete records[args.id];result={deleted:args.id};break;default:throw Error('preview does not execute '+name);}sessionStorage.setItem(storageKey,JSON.stringify(records));return {json:JSON.stringify(result)};}
-mountChat(document.querySelector('#chat-preview'),{call});
+let locale = new URLSearchParams(location.search).get('locale') ?? 'zh-CN';
+const localeListeners = new Set();
+window.fixtureSetLocale = value => {
+  locale = value;
+  for (const listener of localeListeners) listener(value);
+};
+mountChat(document.querySelector('#chat-preview'), {
+  call,
+  get locale() { return locale; },
+  subscribeLocale(listener) {
+    localeListeners.add(listener);
+    return () => localeListeners.delete(listener);
+  },
+});
 `;
 const hostStyle = readFileSync('test-support/host-style.css','utf8');
 writeFileSync('browser-fixture.html', `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chat · 宿主CSS隔离验收</title><style>${hostStyle}\n${readFileSync('dist/ui.css','utf8')}</style><body class="web-shell-app web-shell-workspace"><header><strong>Chrona</strong><nav aria-label="主导航"><a href="#">今天</a><a href="#">对话</a><a href="#">应用</a><a href="#">活动</a><a href="#">设置</a></nav><button>退出</button></header><main id="main"><div id="chat-preview"></div></main><script type="module">import mountChat from './dist/ui.js';\n${fake}</script></body></html>`);

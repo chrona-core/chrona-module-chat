@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from '../locale';
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../cn"
 
@@ -92,6 +93,7 @@ function CodeBlockCopyButton({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button> & { value: string }) {
+  const t = useTranslation();
   const [copied, setCopied] = React.useState(false)
 
   React.useEffect(() => {
@@ -110,7 +112,7 @@ function CodeBlockCopyButton({
         data-copied={copied || undefined}
         variant={variant}
         size={size}
-        aria-label={copied ? "已复制" : "复制代码"}
+        aria-label={copied ? t("已复制") : t("复制代码")}
         className={cn(className)}
         onClick={(event) => {
           onClick?.(event)
@@ -128,7 +130,7 @@ function CodeBlockCopyButton({
         )}
       </Button>
       <span aria-live="polite" className="sr-only">
-        {copied ? "已复制" : ""}
+        {copied ? t("已复制") : ""}
       </span>
     </>
   )

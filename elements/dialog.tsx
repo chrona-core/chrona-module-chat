@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from '../locale';
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "../cn"
 
@@ -49,6 +50,7 @@ function DialogContent({
   container?: HTMLElement
   showCloseButton?: boolean
 }) {
+  const t = useTranslation();
   return (
     <DialogPortal container={container}>
       <DialogOverlay />
@@ -73,7 +75,7 @@ function DialogContent({
             }
           >
             <XIcon />
-            <span className="sr-only">关闭弹窗</span>
+            <span className="sr-only">{t("关闭弹窗")}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
