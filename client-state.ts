@@ -32,7 +32,7 @@ export class Operations {
     const old = this.read(id);
     // A lost HTTP reply keeps the original operation. A new click never invents a replacement key.
     if (old) return old;
-    const op = { id, key: crypto.randomUUID(), kind, input: JSON.stringify(input), draftToken };
+    const op = { id, key: crypto.randomUUID(), kind, input, draftToken };
     this.storage.setItem('chat.operation.' + id, JSON.stringify(op));
     return op;
   }

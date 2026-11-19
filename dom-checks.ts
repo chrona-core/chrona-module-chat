@@ -37,7 +37,7 @@ export async function runDomChecks() {
       case 'create':result=store.create('pi');break;
       case 'read':if(a.observe)observedReads++;result={...await store.reconcile(a.id,a.observe!==true),mindUpdates};break;
       case 'draft':result=store.draft(a.id,JSON.parse(a.patch),a.revision);break;
-      case 'execute':keys.push(a);result=await store.operate(a.id,a.key,a.kind,JSON.parse(a.input));if(a.kind==='message'&&loseMessage){loseMessage=false;throw Error('accepted HTTP reply lost');}if(a.kind==='stop'&&holdStop)await new Promise<void>(r=>releaseStop=r);break;
+      case 'execute':keys.push(a);result=await store.operate(a.id,a.key,a.kind,a.input);if(a.kind==='message'&&loseMessage){loseMessage=false;throw Error('accepted HTTP reply lost');}if(a.kind==='stop'&&holdStop)await new Promise<void>(r=>releaseStop=r);break;
       default:throw Error('unexpected DOM tool '+name);
     }
     return {json:JSON.stringify(result)};
@@ -64,10 +64,10 @@ export async function runDomChecks() {
     assert.equal(q('.chat-send').disabled,true);assert.equal(q('.chat-badge').textContent,'可开始对话');
     const type=(value:string)=>{q('textarea').value=value;q('textarea').dispatchEvent(new window.Event('input',{bubbles:true}) as unknown as Event);};
     type('hello');q('.chat-send').click();await wait(()=>keys.length===1&&!q('.chat-stop').hidden&&!q('.chat-stop').disabled);
-    type('supplement');q('.chat-send').click();await wait(()=>keys.some(x=>x.kind==='message'));
+    type('仅补充内容');q('.chat-send').click();await wait(()=>keys.some(x=>x.kind==='message'));
     await wait(()=>q('.chat-alert').textContent.includes('lost'));
     await refresh();await wait(()=>keys.filter(x=>x.kind==='message').length===2);
-    const sends=keys.filter(x=>x.kind==='message');assert.equal(sends[0].key,sends[1].key);assert.equal(sends[0].input,sends[1].input);
+    const sends=keys.filter(x=>x.kind==='message');assert.equal(sends[0].key,sends[1].key);assert.deepEqual(sends[0].input,sends[1].input);assert.equal(sends[0].input.text,'仅补充内容');
     holdStop=true;await wait(()=>!q('.chat-stop').disabled);q('.chat-stop').click();await wait(()=>!!releaseStop);
     type('new draft while stop reply is delayed');releaseStop!();await wait(()=>q('.chat-stop').hidden);
     assert.equal(q('textarea').value,'new draft while stop reply is delayed');

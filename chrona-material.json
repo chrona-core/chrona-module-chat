@@ -66,7 +66,7 @@
   "artifacts": [
     {
       "path": "dist/ui.js",
-      "sha256": "c8b76d672b2dbfc8e728b36cfe157872eafbb909dabacf766aa784c716bc0b18"
+      "sha256": "dd9ad33bdf0087d55441d987ec674fb8736cdd88868f01b32fd6424e179705d6"
     },
     {
       "path": "dist/ui.css",

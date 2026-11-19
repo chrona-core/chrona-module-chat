@@ -22,7 +22,7 @@ function create(args) {
   return row;
 }
 function send(row,args) {
-  const input=JSON.parse(args.input);
+  const input=args.input;
   if(args.kind==='answer'&&scenario==='questions'){
     const question=row.active.interactions.find(item=>item.id===input.questionId);
     question.status=input.answer.decision==='submit'?'answered':'cancelled';

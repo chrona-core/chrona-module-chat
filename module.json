@@ -406,7 +406,18 @@
             ]
           },
           "input": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "Operation fields. Use {text} for message, {questionId, answer} for answer, {} for stop or send from the saved draft.",
+                "properties": {},
+                "additionalProperties": true
+              },
+              {
+                "type": "string",
+                "description": "Previously serialized input for replaying an existing request."
+              }
+            ]
           }
         },
         "required": [

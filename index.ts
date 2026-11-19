@@ -85,7 +85,7 @@ on('tool',async event=>{
    case 'detach':result=store.detach(a.id,a.attachmentId);break;
    case 'new-context':result=store.newContext(a.id,a.confirmed);break;
    case 'image':result=store.image(a.id,a.attachmentId);break;
-   case 'execute':store.mindTarget=chrona.dependencies.mind?{moduleId:chrona.dependencies.mind,tool:'context'}:null;result=await store.operate(a.id,a.key,a.kind,JSON.parse(a.input));break;
+   case 'execute':store.mindTarget=chrona.dependencies.mind?{moduleId:chrona.dependencies.mind,tool:'context'}:null;result=await store.operate(a.id,a.key,a.kind,typeof a.input === 'string' ? JSON.parse(a.input) : a.input);break;
    case 'observations':result=store.observations.observations(a);break;
    case 'snapshot':result=store.observations.snapshot(a);break;
    case 'observation-inventory':result=store.observations.inventory(a);break;
